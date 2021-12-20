@@ -8,12 +8,27 @@ presence and connectivity of collaterals is needed in acute stroke situations to
 be effective. We propose to develop an automated system to evaluate collateral vessel trees from computed
 tomography angiography (CTA) images.
 
+SRC
+===
 In this github repository (https://github.com/KitwareMedical/StrokeCollateralVessels) we are freely releasing
 jupyter notebooks for assessing vessel and perfusion characteristics of patients with stroke.
 
+Data
+====
 The data processed by these notebooks is restricted from public dissemination per IRB limitations.
 
-This tools and techniques were developed, in part, with funding by NIH/NINDS grant "Automated Assessment of
+If you are authorized to access that data, please do the following:
+1) Copy Data-Download-Template.sh to Data-Download.sh
+2) Edit Data-Download.sh, replacing the <EnterYourAPIKeyHere> with your
+api key from data.kitware.com
+
+ACKNOWLEDGMENTS
+===============
+These tools and techniques were developed, in part, with funding by NIH/NINDS grant "Automated Assessment of
 Leptomeningeal Collaterals on CT Angiograms" (R42NS086295, PI: Yueh Lee, MD - Department of Radiology,
 The University of North Carolina at Chapel Hill) in collaboration with Dr. Marc Niethammer (UNC Computer Science),
 Christopher Karakasis, MD (Cleveland Clinic Lerner College of Medicine), and Dr. Stephen Aylward (Kitware).
+
+CONTACT AND SUPPORT
+===================
+Please use the github issue tracker for bug reports, questions, and feature requests.
