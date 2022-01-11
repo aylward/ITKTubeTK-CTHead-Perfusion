@@ -1,4 +1,4 @@
-# Stroke Collateral Vessels
+# ITKTubeTK Stroke Collateral Vessels
 
 Leptomeningeal collateral vessels provide connections between vascular territories in the brain when
 occlusions occur, e.g., when a person suffers a stroke. The number and connectivity of collateral vessels
@@ -10,7 +10,7 @@ tomography angiography (CTA) images.
 
 SRC
 ===
-In this github repository (https://github.com/KitwareMedical/StrokeCollateralVessels) we are freely releasing
+In this github repository (https://github.com/KitwareMedical/ITKTubeTK-StrokeCollateralVessels) we are freely releasing
 jupyter notebooks for assessing vessel and perfusion characteristics of patients with stroke.
 
 Data
