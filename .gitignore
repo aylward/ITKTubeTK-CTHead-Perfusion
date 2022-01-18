@@ -1,5 +1,9 @@
 data
+clinical_data
 Data-Download.sh
 *~
 *.swp
 .ipynb_checkpoints
+__pycache__
+results
+archive
