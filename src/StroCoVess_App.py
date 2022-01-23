@@ -18,7 +18,7 @@ from itk import TubeTK as tube
 import site
 site.addsitedir('../lib')
 
-from SCV_Lib import *
+from StrokeCollateralVessels_Lib import *
 
 class CTP_App(tk.Tk):
 
@@ -120,10 +120,15 @@ class CTP_App(tk.Tk):
             text="Set 3D DSA file",
             command=self.hdl_dsa,
             width=20).pack()
-        self.brain_segmented = tk.IntVar()
-        ckb_brain_segmented = tk.Checkbutton(master=frm_ctp,
-            text="Brain already segmented",
-            variable=self.brain_segmented,
+        self.skip_brain_segmentation = tk.IntVar()
+        ckb_skip_brain_segmentation = tk.Checkbutton(master=frm_ctp,
+            text="Skip brain segmentation",
+            variable=self.skip_brain_segmentation,
+            bg="light sky blue").pack()
+        self.skip_vessel_enhancement = tk.IntVar()
+        ckb_skip_vessel_enhancement = tk.Checkbutton(master=frm_ctp,
+            text="Skip vessel enhancement",
+            variable=self.skip_vessel_enhancement,
             bg="light sky blue").pack()
         frm_ctp.pack(padx=5,fill=tk.X)
     
@@ -195,7 +200,6 @@ class CTP_App(tk.Tk):
     
         frm_scv.pack(fill=tk.BOTH)
 
-
     def hdl_help(self):
         box_help = tk.messagebox.showinfo(title="Help",
             message = "      Stoke Collateral Vessels \n" +
@@ -264,54 +268,74 @@ class CTP_App(tk.Tk):
         webbrowser.open(url)
     
     def hdl_ctp(self):
+        initialdir = None
         if len(self.ctp_files)>0:
             initialdir = os.path.dirname(self.ctp_files[0])
-            self.ctp_files = list(tk.filedialog.askopenfilenames(
-                initialdir=initialdir))
-        else:
-            self.ctp_files = list(tk.filedialog.askopenfilenames())
+        self.ctp_files = list(tk.filedialog.askopenfilenames(
+            initialdir=initialdir))
         self.cta_file = ""
-        self.cbf_file = ""
-        self.cbv_file = ""
-        self.tmax_file = ""
-        self.ttp_file = ""
 
     def hdl_cta(self):
+        initialdir = None
+        initialfile = None
+        if len(self.cta_file)>0:
+            initialdir,initialfile = os.path.split(self.cta_file)
         self.cta_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.cta_file))
+            initialdir=initialdir,
+            initialfile=initialfile))
         self.ctp_files = []
-        self.cbf_file = ""
-        self.cbv_file = ""
-        self.tmax_file = ""
-        self.ttp_file = ""
 
     def hdl_dsa(self):
+        initialdir = None
+        initialfile = None
+        if len(self.dsa_file)>0:
+            initialdir,initialfile = os.path.split(self.dsa_file)
         self.dsa_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.dsa_file))
-        self.cbf_file = ""
-        self.cbv_file = ""
-        self.tmax_file = ""
-        self.ttp_file = ""
+            initialdir=initialdir,
+            initialfile=initialfile))
 
     def hdl_cbf(self):
+        initialdir = None
+        initialfile = None
+        if len(self.cbf_file)>0:
+            initialdir,initialfile = os.path.split(self.cbf_file)
         self.cbf_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.cbf_file))
+            initialdir=initialdir,
+            initialfile=initialfile))
 
     def hdl_cbv(self):
+        initialdir = None
+        initialfile = None
+        if len(self.cbv_file)>0:
+            initialdir,initialfile = os.path.split(self.cbv_file)
         self.cbv_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.cbv_file))
+            initialdir=initialdir,
+            initialfile=initialfile))
 
     def hdl_tmax(self):
+        initialdir = None
+        initialfile = None
+        if len(self.tmax_file)>0:
+            initialdir,initialfile = os.path.split(self.tmax_file)
         self.tmax_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.tmax_file))
+            initialdir=initialdir,
+            initialfile=initialfile))
 
     def hdl_ttp(self):
+        initialdir = None
+        initialfile = None
+        if len(self.ttp_file)>0:
+            initialdir,initialfile = os.path.split(self.ttp_file)
         self.ttp_file = os.path.realpath(tk.filedialog.askopenfilename(
-            initialfile=self.ttp_file))
+            initialdir=initialdir,
+            initialfile=initialfile))
 
     def hdl_process_out_dir(self):
+        initialdir = None
+        if len(self.process_out_dir)>0:
+            initialdir = self.process_out_dir
         self.process_out_dir = os.path.realpath(tk.filedialog.askdirectory(
-            initialdir=self.process_out_dir))
+            initialdir=initialdir))
 
     def report_progress(self, label, percentage):
         self.progress_status = label
@@ -329,6 +353,9 @@ class CTP_App(tk.Tk):
         if not os.path.exists(self.process_out_dir):
             os.mkdir(self.process_out_dir)
 
+        # User must supply either CTA or CTP data
+        # They can also provide DSA data, but it must have had
+        #    the brain extracted already.
         cta_im = None
         dsa_im = None
         if len(self.ctp_files)>0:
@@ -337,7 +364,7 @@ class CTP_App(tk.Tk):
             if not os.path.exists(ctp_reg_output_dir):
                 os.mkdir(ctp_reg_output_dir)
             ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(self.ctp_files,
-                report_progress=self.report_subprogress,
+                report_progress = self.report_subprogress,
                 debug=True,
                 output_dir=ctp_reg_output_dir)
             self.report_progress("Converting CTP to CTA",10)
@@ -361,59 +388,220 @@ class CTP_App(tk.Tk):
                 message="Must set CTP files or CTA file.")
             return
 
-        if self.brain_segmented.get() == 0:
+        if dsa_im==None and len(self.dsa_file)>0:
+            self.report_progress("Reading DSA",5)
+            dsa_im = itk.imread(self.dsa_file,itk.F)
+            self.report_progress("Reading DSA",10)
+
+        # Check if brain segmentation is required
+        if self.skip_brain_segmentation.get() == 0:
             self.report_progress("Segmenting Brain",20)
             if cta_im != None:
                 cta_brain_im = scv_segment_brain_from_cta(cta_im,
-                    report_progress=self.report_subprogress,
+                    report_progress = self.report_subprogress,
                     debug=True)
-                itk.imwrite(cta_brain_im,self.process_out_dir+"/cta_brain.mha",
+                itk.imwrite(cta_brain_im,
+                    self.process_out_dir+"/cta_brain.mha",
                     compression=True)
+                # Use CTA brain to mask DSA and create DSA_Brain image
+                if dsa_im != None:
+                    ImageMath = tube.ImageMath.New(Input=dsa_im)
+                    ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
+                        0.000001,9999,0)
+                    dsa_brain_im = ImageMath.GetOutput()
+                    itk.imwrite(dsa_brain_im,
+                        self.process_out_dir+"/dsa_brain.mha",
+                        compression=True)
             else:
+                # If it is required and a CTA wasn't provided
+                #   or CTA wasn't generated from CTP, then throw and error
                 self.report_progress("ERROR",100)
                 tk.messagebox.showerror(title="Error",
-                    message="DSA must have prior brain segmentation \n" +
-                            "or CTP or CTA must be included with it.")
+                    message="Cannot perform brain segmentation using DSA.\n" +
+                            "Please also include CTP or CTA data.")
                 return
+        else:
+            cta_brain_im = cta_im
+            dsa_brain_im = dsa_im
 
         in_im = cta_im
         in_brain_im = cta_brain_im
         in_name = "cta"
+        # If DSA is available, use it instead of CTA
         if dsa_im != None:
-            if self.brain_segmented.get() == 0:
-                ImageMath = tube.ImageMath.New(Input=dsa_im)
-                ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
-                    0.001,9999,0)
-                dsa_brain_im = ImageMath.GetOutput()
-                itk.imwrite(dsa_brain_im,
-                    self.process_out_dir+"/dsa_brain.mha",
-                    compressed=True)
             in_im = dsa_im
             in_brain_im = dsa_brain_im
             in_name = "dsa"
 
-        self.report_progress("Enhancing vessels",40)
-        in_vess,in_brain_vess = scv_enhance_vessels_in_cta(
-            in_im,
-            in_brain_im,
-            report_progress=self.report_subprogress,
-            debug=True)
-        itk.imwrite(dsa_vess,
-            self.process_out_dir+"/"+in_name+"_vessels.mha",
-            compression=True)
-        itk.imwrite(dsa_brain_vess,
-            self.process_out_dir+"/"+in_name+"_brain_vessels.mha",
-            compression=True)
+        if self.skip_vessel_enhancement == 0:
+            self.report_progress("Enhancing vessels",40)
+            # Enhancing vessels creates an image in which intensity is
+            #    related to "vesselness" instead of being related to the
+            #    amount of contrast agent in the vessel.  This simplifies
+            #    subsequent vessel seeding and traversal stopping criteria.
+            in_vess_im,in_brain_vess_im = scv_enhance_vessels_in_cta(
+                in_im,
+                in_brain_im,
+                report_progress=self.report_subprogress,
+                debug=True)
+            if self.skip_brain_segmentation.get() == 0:
+                itk.imwrite(in_vess_im,
+                    self.process_out_dir+"/"+in_name+"_vessels_enhanced.mha",
+                    compression=True)
+            itk.imwrite(in_brain_vess_im,
+                self.process_out_dir+"/"+in_name+"_brain_vessels_enhanced.mha",
+                compression=True)
+        else:
+            in_vess_im = in_im
+            in_brain_vess_im = in_brain_im
 
         self.report_progress("Extracting vessels",60)
-        vess_mask,vess_so = scv_extract_vessels_from_cta(
-            in_vess,
-            in_brain_vess,
+        vess_mask_im,vess_so = scv_extract_vessels_from_cta(
+            in_vess_im,
+            in_brain_vess_im,
             report_progress=self.report_subprogress,
             debug=True,
-            output_dir=ctp_reg_output_dir)
+            output_dir=self.process_out_dir)
+
+        brain_name = ""
+        if self.skip_brain_segmentation.get() == 1:
+            brain_name = "_brain"
         
-        self.report_progress("Generating report",90)
+        itk.imwrite(in_brain_vess_im,
+            self.process_out_dir+"/"+in_name+brain_name+"_vessels_extracted.mha",
+            compression=True)
+
+        SOWriter = itk.SpatialObjectWriter[3].New()
+        SOWriter.SetInput(vess_so)
+        SOWriter.SetBinaryPoints(True)
+        SOWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
+            "_vessels_extracted.tre")
+        SOWriter.Update()
+
+        VTPWriter = itk.WriteTubesAsPolyData.New()
+        VTPWriter.SetInput(vess_so)
+        VTPWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
+            "_vessels_extracted.vtp")
+        VTPWriter.Update()
+        
+        self.report_progress("Generating Perfusion Stats",80)
+
+        atlas_im = itk.imread("../data/Atlas/atlas_brainweb.mha",itk.F)
+        atlas_mask_im = itk.imread("../data/Atlas/atlas_brainweb_mask.mha",
+            itk.F)
+        atlas_reg_im,atlas_mask_reg_im = scv_register_atlas_to_image(
+            atlas_im,
+            atlas_mask_im,
+            in_brain_im)
+        ImageMath = tube.ImageMath.New(Input=atlas_mask_reg_im)
+        ImageMath.ReplaceValuesOutsideMaskRange(vess_mask_im,
+            0.000001,9999,4)
+        ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
+            0.000001,9999,0)
+        vess_atlas_mask_im = ImageMath.GetOutput()
+
+        TubeMath = ttk.TubeMath[3,itk.F].New()
+        TubeMath.SetInputTubeGroup(vess_so)
+        TubeMath.SetUseAllTubes()
+        TubeMath.ComputeTubeRegions(vess_atlas_mask_im)
+        ttp_im = None
+        if len(self.ttp_file) > 0:
+            self.report_progress("Generating TTP Graphs",92)
+            ttp_im = itk.imread(self.ttp_file, itk.F)
+            TubeMath.SetPointValuesFromImage(ttp_im, "TTP")
+            TubeMath.SetPointValuesFromTubeRegions(ttp_im,
+                "TTP_Tissue",
+                1.5,
+                4)
+            time_bin,ttp_bin,ttp_count = scv_compute_atlas_region_stats(
+                vess_atlas_mask_im,
+                ttp_im,
+                ttp_im,
+                100,
+                self.report_subprogress)
+            graph_label.append("TPP")
+            graph_data.append(time_bin[0,:])
+            for r in range(1,ttp_bin.shape[0]):
+                graph_label.append("Count_Region_"+str(r))
+                graph_data.append(ttp_count[r,:])
+
+        graph_label = []
+        graph_data = []
+
+        if len(self.cbf_file) > 0:
+            self.report_progress("Generating CBF Graphs",94)
+            cbf_im = itk.imread(self.cbf_file, itk.F)
+            TubeMath.SetPointValuesFromImage(cbf_im, "CBF")
+            TubeMath.SetPointValuesFromTubeRegions(cbf_im,
+                "CBF_Tissue",
+                1.5,
+                4)
+            if ttp_im!=None:
+                time_bin,cbf_bin,cbf_count = scv_compute_atlas_region_stats(
+                    vess_atlas_mask_im,
+                    ttp_im,
+                    cbf_im,
+                    100,
+                    self.report_subprogress)
+                graph_label.append("TTP")
+                graph_data.append(time_bin[0,:])
+                graph_label.append("Count")
+                graph_data.append(cbf_count[0,:])
+                for r in range(1,cbf_bin.shape[0]):
+                    graph_label.append("CBF_Region_"+str(r))
+                    graph_data.append(cbf_bin[r,:])
+
+        if len(self.cbv_file) > 0:
+            self.report_progress("Generating CBV Graphs",96)
+            cbv_im = itk.imread(self.cbv_file, itk.F)
+            TubeMath.SetPointValuesFromImage(cbv_im, "CBV")
+            TubeMath.SetPointValuesFromTubeRegions(cbv_im,
+                "CBV_Tissue",
+                1.5,
+                4)
+            if ttp_im!=None:
+                time_bin,cbv_bin,cbv_count = scv_compute_atlas_region_stats(
+                    vess_atlas_mask_im,
+                    ttp_im,
+                    cbv_im,
+                    100,
+                    self.report_subprogress)
+                for r in range(1,cbv_bin.shape[0]):
+                    graph_label.append("CBV_Region_"+str(r))
+                    graph_data.append(cbv_bin[r,:])
+        if len(self.tmax_file) > 0:
+            self.report_progress("Generating TMax Graphs",98)
+            tmax_im = itk.imread(self.tmax_file, itk.F)
+            TubeMath.SetPointValuesFromImage(tmax_im, "TMax")
+            TubeMath.SetPointValuesFromTubeRegions(tmax_im,
+                "TMax_Tissue",
+                1.5,
+                4)
+            if ttp_im!=None:
+                time_bin,tmax_bin,tmax_count = scv_compute_atlas_region_stats(
+                    vess_atlas_mask_im,
+                    ttp_im,
+                    tmax_im,
+                    100,
+                    self.report_subprogress)
+                for r in range(1,tmax_bin.shape[0]):
+                    graph_label.append("TMax_Region_"+str(r))
+                    graph_data.append(tmax_bin[r,:])
+
+        self.report_progress("Saving results",99)
+        SOWriter = itk.SpatialObjectWriter[3].New()
+        SOWriter.SetInput(vess_so)
+        SOWriter.SetBinaryPoints(True)
+        SOWriter.SetFileName( self.process_out_dir+"/"+in_name+brain_name+
+            "_vessels_extracted_perf.tre")
+        SOWriter.Update()
+
+        VTPWriter = itk.WriteTubesAsPolyData.New()
+        VTPWriter.SetInput(vess_so)
+        VTPWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
+            "_vessels_extracted_perf.vtp")
+        VTPWriter.Update()
+        
         self.report_progress("Done!",100)
     
 if __name__ == '__main__':
