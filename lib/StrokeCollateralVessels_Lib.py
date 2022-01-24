@@ -51,7 +51,9 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
     immath.Dilate(10,1,0)
     base_mask_im = immath.GetOutputUChar()
     if debug and output_dir!=None:
-        itk.imwrite(base_mask_im,output_dir+"/mask.mha",compression=True)
+        itk.imwrite(base_mask_im,
+            output_dir+"/mask.mha",
+            compression=True)
 
     base_mask_array = itk.GetArrayViewFromImage(base_mask_im)
     base_mask_array[0:4,:,:] = 0
@@ -111,7 +113,8 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
                                               imMoving,tfm,-1024)
             if debug and output_dir!=None:
                 pname,fname = os.path.split(filenames[imNum])
-                itk.imwrite(imMovingReg,output_dir+"/"+fname,
+                itk.imwrite(imMovingReg,
+                    output_dir+"/"+fname,
                     compression=True)
     
             imdataTmp = itk.GetArrayFromImage(imMovingReg)
@@ -122,7 +125,8 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
         elif debug and output_dir!=None:
             imMoving = itk.imread(filenames[imNum],itk.F)
             pname,fname = os.path.split(filenames[imNum])
-            itk.imwrite(imMoving,output_dir+"/"+fname,
+            itk.imwrite(imMoving,
+                output_dir+"/"+fname,
                 compression=True)
     
     
@@ -270,7 +274,7 @@ def scv_enhance_vessels_in_cta(cta_image,
 
     report_progress("Segmenting Initial Vessels",30)
     vSeg = ttk.SegmentTubes.New(Input=cta_roi_image)
-    vSeg.SetVerbose(True)
+    vSeg.SetVerbose(debug)
     vSeg.SetMinRoundness(0.4)
     vSeg.SetMinCurvature(0.002)
     vSeg.SetRadiusInObjectSpace( 1 )
@@ -383,7 +387,8 @@ def scv_extract_vessels_from_cta(cta_image,
     
     if debug and output_dir!=None:
         itk.imwrite(initial_radius_im,
-            output_dir+"/vessel_extraction_initial_radius.mha")
+            output_dir+"/vessel_extraction_initial_radius.mha",
+            compression=True)
 
     report_progress("Generating input",30)
     imMath.SetInput(cta_image)
@@ -395,11 +400,12 @@ def scv_extract_vessels_from_cta(cta_image,
 
     if debug and output_dir!=None:
         itk.imwrite(input_im,
-            output_dir+"/vessel_extraction_input.mha")
+            output_dir+"/vessel_extraction_input.mha",
+            compression=True)
 
     report_progress("Extracting vessels",40)
     vSeg = ttk.SegmentTubes.New(Input=input_im)
-    vSeg.SetVerbose(True)
+    vSeg.SetVerbose(debug)
     vSeg.SetMinCurvature(0)#.0001)
     vSeg.SetMinRoundness(0.02)
     vSeg.SetMinRidgeness(0.5)
@@ -419,7 +425,8 @@ def scv_extract_vessels_from_cta(cta_image,
 
     if debug and output_dir!=None:
         itk.imwrite(tubeMaskImage,
-            output_dir+"/vessel_extraction_output.mha")
+            output_dir+"/vessel_extraction_output.mha",
+            compression=True)
 
     report_progress("Done",100)
     return tubeMaskImage,vSeg.GetTubeGroup()
@@ -440,7 +447,9 @@ def scv_register_atlas_to_image(atlas_im, atlas_mask_im, in_im):
     
     return atlas_reg_im,atlas_mask_reg_im
 
-def scv_compute_atlas_region_stats(atlas_im, time_im, vess_im,
+def scv_compute_atlas_region_stats(atlas_im,
+                                   time_im,
+                                   vess_im,
                                    number_of_time_bins=100,
                                    report_progress=print,
                                    debug=False):
@@ -449,25 +458,29 @@ def scv_compute_atlas_region_stats(atlas_im, time_im, vess_im,
     time_arr = itk.GetArrayFromImage(time_im)
     vess_arr = itk.GetArrayFromImage(vess_im)
 
-    num_regions = atlas_arr.max()
+    num_regions = int(atlas_arr.max())
     time_max = time_arr.max()
     time_min = time_arr.min()
-    nbins = number_of_time_bins
-    time_factor = (time_max-time_min)/(nbins-1)
+    nbins = int(number_of_time_bins)
+    time_factor = (time_max-time_min)/(nbins+1)
 
     bin_value = np.zeros([num_regions,nbins])
     bin_count = np.zeros([num_regions,nbins])
 
+    print("Bin value shape = ", bin_value.shape)
     for atlas_region in range(num_regions):
         report_progress("Masking",(atlas_region+1)*(100/num_regions))
-        indx = np.where(atlas_arr==atlas_region)
-        for i in indx:
-            time_bin = int((time_arr[i]-time_min)*time_factor)
-            bin_count[atlas_region,time_bin] += 1
-            bin_value[atlas_region,time_bin] += vess_arr[i]
+        indx_arr = np.where(atlas_arr==atlas_region)
+        indx_list = list(zip(indx_arr[0],indx_arr[1],indx_arr[2]))
+        for indx in indx_list:
+            time_bin = int((time_arr[indx]-time_min)*time_factor)
+            time_bin = min(max(0,time_bin),nbins-1)
+            if np.isnan(vess_arr[indx]) == False:
+                bin_count[atlas_region,time_bin] += 1
+                bin_value[atlas_region,time_bin] += vess_arr[indx]
 
-    bin_value = np.where(bin_count!=0,bin_value/bin_count,0)
-    bin_label = np.arrange(nbins)/time_factor + time_min
+    bin_label = np.arange(nbins) * time_factor - time_min
+    bin_value = np.divide(bin_value,bin_count,where=bin_count!=0)
 
     report_progress("Done",100)
     return bin_label,bin_value,bin_count

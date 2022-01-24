@@ -1,9 +1,8 @@
-debug = True
-
 import os
 import sys
 import subprocess
 import pathlib
+import csv
 
 import tkinter as tk
 import tkinter.filedialog
@@ -175,6 +174,11 @@ class CTP_App(tk.Tk):
             command=self.hdl_process_out_dir,
             width=20
             ).pack(pady=5)
+        self.debug = tk.IntVar()
+        ckb_debug = tk.Checkbutton(master=frm_process,
+            text="Debug",
+            bg="light sky blue",
+            variable=self.debug).pack()
         btn_process = tk.Button(master=frm_process,
             text="Go!",
             command=self.hdl_process,
@@ -339,19 +343,26 @@ class CTP_App(tk.Tk):
 
     def report_progress(self, label, percentage):
         self.progress_status = label
+        print(label)
         self.lbl_progress['text'] = label
         self.pgb_progress['value'] = percentage
         self.pgb_subprogress['value'] = 0
         self.update()
 
     def report_subprogress(self, label, percentage):
-        self.lbl_progress['text'] = self.progress_status+": "+label
+        progress_label = self.progress_status+": "+label
+        self.lbl_progress['text'] = progress_label
+        print(progress_label)
         self.pgb_subprogress['value'] = percentage
         self.update()
 
     def hdl_process(self):
         if not os.path.exists(self.process_out_dir):
             os.mkdir(self.process_out_dir)
+
+        debug = False
+        if self.debug.get() == 1:
+            debug = True
 
         # User must supply either CTA or CTP data
         # They can also provide DSA data, but it must have had
@@ -365,7 +376,7 @@ class CTP_App(tk.Tk):
                 os.mkdir(ctp_reg_output_dir)
             ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(self.ctp_files,
                 report_progress = self.report_subprogress,
-                debug=True,
+                debug=debug,
                 output_dir=ctp_reg_output_dir)
             self.report_progress("Converting CTP to CTA",10)
             itk.imwrite(ct_im,self.process_out_dir+"/ct.mha",
@@ -399,7 +410,7 @@ class CTP_App(tk.Tk):
             if cta_im != None:
                 cta_brain_im = scv_segment_brain_from_cta(cta_im,
                     report_progress = self.report_subprogress,
-                    debug=True)
+                    debug=debug)
                 itk.imwrite(cta_brain_im,
                     self.process_out_dir+"/cta_brain.mha",
                     compression=True)
@@ -433,7 +444,7 @@ class CTP_App(tk.Tk):
             in_brain_im = dsa_brain_im
             in_name = "dsa"
 
-        if self.skip_vessel_enhancement == 0:
+        if self.skip_vessel_enhancement.get() == 0:
             self.report_progress("Enhancing vessels",40)
             # Enhancing vessels creates an image in which intensity is
             #    related to "vesselness" instead of being related to the
@@ -443,7 +454,7 @@ class CTP_App(tk.Tk):
                 in_im,
                 in_brain_im,
                 report_progress=self.report_subprogress,
-                debug=True)
+                debug=debug)
             if self.skip_brain_segmentation.get() == 0:
                 itk.imwrite(in_vess_im,
                     self.process_out_dir+"/"+in_name+"_vessels_enhanced.mha",
@@ -460,7 +471,7 @@ class CTP_App(tk.Tk):
             in_vess_im,
             in_brain_vess_im,
             report_progress=self.report_subprogress,
-            debug=True,
+            debug=debug,
             output_dir=self.process_out_dir)
 
         brain_name = ""
@@ -486,8 +497,12 @@ class CTP_App(tk.Tk):
         
         self.report_progress("Generating Perfusion Stats",80)
 
-        atlas_im = itk.imread("../data/Atlas/atlas_brainweb.mha",itk.F)
-        atlas_mask_im = itk.imread("../data/Atlas/atlas_brainweb_mask.mha",
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        atlas_im = itk.imread(
+            script_dir+"/atlas/atlas_brainweb.mha",
+            itk.F)
+        atlas_mask_im = itk.imread(
+            script_dir+"/atlas/atlas_brainweb_mask.mha",
             itk.F)
         atlas_reg_im,atlas_mask_reg_im = scv_register_atlas_to_image(
             atlas_im,
@@ -504,10 +519,17 @@ class CTP_App(tk.Tk):
         TubeMath.SetInputTubeGroup(vess_so)
         TubeMath.SetUseAllTubes()
         TubeMath.ComputeTubeRegions(vess_atlas_mask_im)
+
+        graph_label = None
+        graph_data = None
         ttp_im = None
         if len(self.ttp_file) > 0:
             self.report_progress("Generating TTP Graphs",92)
             ttp_im = itk.imread(self.ttp_file, itk.F)
+            Resample = ttk.ResampleImage.New(Input=ttp_im)
+            Resample.SetMatchImage(vess_atlas_mask_im)
+            Resample.Update()
+            ttp_im = Resample.GetOutput()
             TubeMath.SetPointValuesFromImage(ttp_im, "TTP")
             TubeMath.SetPointValuesFromTubeRegions(ttp_im,
                 "TTP_Tissue",
@@ -519,18 +541,26 @@ class CTP_App(tk.Tk):
                 ttp_im,
                 100,
                 self.report_subprogress)
-            graph_label.append("TPP")
-            graph_data.append(time_bin[0,:])
+            graph_label = ["Bin_Num"]
+            graph_data = np.arange(len(time_bin))
+            graph_label = np.append(graph_label,"TPP")
+            graph_data = np.stack((graph_data,time_bin))
             for r in range(1,ttp_bin.shape[0]):
-                graph_label.append("Count_Region_"+str(r))
-                graph_data.append(ttp_count[r,:])
+                graph_label = np.append(graph_label,
+                    "Count_Region_"+str(r))
+                graph_data = np.concatenate((graph_data,
+                    [ttp_count[r,:]]))
+            print(graph_label.shape)
+            print(graph_data.shape)
 
-        graph_label = []
-        graph_data = []
 
         if len(self.cbf_file) > 0:
             self.report_progress("Generating CBF Graphs",94)
             cbf_im = itk.imread(self.cbf_file, itk.F)
+            Resample = ttk.ResampleImage.New(Input=cbf_im)
+            Resample.SetMatchImage(vess_atlas_mask_im)
+            Resample.Update()
+            cbf_im = Resample.GetOutput()
             TubeMath.SetPointValuesFromImage(cbf_im, "CBF")
             TubeMath.SetPointValuesFromTubeRegions(cbf_im,
                 "CBF_Tissue",
@@ -543,17 +573,19 @@ class CTP_App(tk.Tk):
                     cbf_im,
                     100,
                     self.report_subprogress)
-                graph_label.append("TTP")
-                graph_data.append(time_bin[0,:])
-                graph_label.append("Count")
-                graph_data.append(cbf_count[0,:])
                 for r in range(1,cbf_bin.shape[0]):
-                    graph_label.append("CBF_Region_"+str(r))
-                    graph_data.append(cbf_bin[r,:])
+                    graph_label = np.append(graph_label,
+                        "CBF_Region"+str(r))
+                    graph_data = np.concatenate((graph_data,
+                        [cbf_bin[r,:]]))
 
         if len(self.cbv_file) > 0:
             self.report_progress("Generating CBV Graphs",96)
             cbv_im = itk.imread(self.cbv_file, itk.F)
+            Resample = ttk.ResampleImage.New(Input=cbv_im)
+            Resample.SetMatchImage(vess_atlas_mask_im)
+            Resample.Update()
+            cbv_im = Resample.GetOutput()
             TubeMath.SetPointValuesFromImage(cbv_im, "CBV")
             TubeMath.SetPointValuesFromTubeRegions(cbv_im,
                 "CBV_Tissue",
@@ -567,11 +599,17 @@ class CTP_App(tk.Tk):
                     100,
                     self.report_subprogress)
                 for r in range(1,cbv_bin.shape[0]):
-                    graph_label.append("CBV_Region_"+str(r))
-                    graph_data.append(cbv_bin[r,:])
+                    graph_label = np.append(graph_label,
+                        "CBV_Region"+str(r))
+                    graph_data = np.concatenate((graph_data,
+                        [cbv_bin[r,:]]))
         if len(self.tmax_file) > 0:
             self.report_progress("Generating TMax Graphs",98)
             tmax_im = itk.imread(self.tmax_file, itk.F)
+            Resample = ttk.ResampleImage.New(Input=tmax_im)
+            Resample.SetMatchImage(vess_atlas_mask_im)
+            Resample.Update()
+            tmax_im = Resample.GetOutput()
             TubeMath.SetPointValuesFromImage(tmax_im, "TMax")
             TubeMath.SetPointValuesFromTubeRegions(tmax_im,
                 "TMax_Tissue",
@@ -585,8 +623,10 @@ class CTP_App(tk.Tk):
                     100,
                     self.report_subprogress)
                 for r in range(1,tmax_bin.shape[0]):
-                    graph_label.append("TMax_Region_"+str(r))
-                    graph_data.append(tmax_bin[r,:])
+                    graph_label = np.append(graph_label,
+                        "TMax_Region"+str(r))
+                    graph_data = np.concatenate((graph_data,
+                        [tmax_bin[r,:]]))
 
         self.report_progress("Saving results",99)
         SOWriter = itk.SpatialObjectWriter[3].New()
@@ -601,7 +641,18 @@ class CTP_App(tk.Tk):
         VTPWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
             "_vessels_extracted_perf.vtp")
         VTPWriter.Update()
-        
+
+        csvfilename = self.process_out_dir+"/"+in_name+brain_name
+        csvfilename += "_vessels_extracted_perf.csv"
+        csvfile = open(csvfilename,'w',newline='')
+        csvwriter = csv.writer(csvfile,
+            dialect='excel',
+            quoting=csv.QUOTE_NONE)
+        csvwriter.writerow(graph_label)
+        for r in range(graph_data.shape[1]):
+            csvwriter.writerow(['{:f}'.format(x) for x in graph_data[:,r]])
+        csvfile.close()
+
         self.report_progress("Done!",100)
     
 if __name__ == '__main__':
