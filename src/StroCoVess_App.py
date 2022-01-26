@@ -514,6 +514,10 @@ class CTP_App(tk.Tk):
         ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
             0.000001,9999,0)
         vess_atlas_mask_im = ImageMath.GetOutput()
+        #if debug:
+        itk.imwrite(vess_atlas_mask_im,
+            self.process_out_dir+"/"+in_name+brain_name+"_vess_atlas_mask.mha",
+            compression=True)
 
         TubeMath = ttk.TubeMath[3,itk.F].New()
         TubeMath.SetInputTubeGroup(vess_so)
