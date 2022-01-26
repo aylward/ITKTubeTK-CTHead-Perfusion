@@ -15,10 +15,10 @@ import numpy as np
 #################
 #################
 #################
-def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
-                           output_dir=None):
-    if report_progress == None:
-        report_progress = print
+def scv_convert_ctp_to_cta(filenames,report_progress=print,
+                           debug=False,
+                           output_dir="."):
+
     filenames.sort()
     num_images = len(filenames)
 
@@ -47,11 +47,13 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
     immath.Blur(1)
     base_blur_im = immath.GetOutput()
 
-    immath.Threshold(150, 800, 1, 0)
-    immath.Dilate(10, 1, 0)
+    immath.Threshold(150,800,1,0)
+    immath.Dilate(10,1,0)
     base_mask_im = immath.GetOutputUChar()
-    if debug:
-        itk.imwrite(base_mask_im, output_dir+"/mask.mha",compression=True)
+    if debug and output_dir!=None:
+        itk.imwrite(base_mask_im,
+            output_dir+"/mask.mha",
+            compression=True)
 
     base_mask_array = itk.GetArrayViewFromImage(base_mask_im)
     base_mask_array[0:4,:,:] = 0
@@ -65,7 +67,7 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
     
     Dimension = 3
     PixelType = itk.ctype('float')
-    ImageType = itk.Image[PixelType, Dimension]
+    ImageType = itk.Image[PixelType,Dimension]
 
     imdatamax = itk.GetArrayFromImage(base_iso_im)
     imdatamin = imdatamax
@@ -111,7 +113,8 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
                                               imMoving,tfm,-1024)
             if debug and output_dir!=None:
                 pname,fname = os.path.split(filenames[imNum])
-                itk.imwrite(imMovingReg,output_dir+"/"+fname,
+                itk.imwrite(imMovingReg,
+                    output_dir+"/"+fname,
                     compression=True)
     
             imdataTmp = itk.GetArrayFromImage(imMovingReg)
@@ -122,7 +125,8 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
         elif debug and output_dir!=None:
             imMoving = itk.imread(filenames[imNum],itk.F)
             pname,fname = os.path.split(filenames[imNum])
-            itk.imwrite(imMoving,output_dir+"/"+fname,
+            itk.imwrite(imMoving,
+                output_dir+"/"+fname,
                 compression=True)
     
     
@@ -138,7 +142,7 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
     dsa.CopyInformation(base_iso_im)
 
     report_progress("Done",100)
-    return ct, cta, dsa
+    return ct,cta,dsa
 
 
 #################
@@ -147,9 +151,10 @@ def scv_convert_ctp_to_cta(filenames,report_progress=None,debug=False,
 #################
 #################
 def scv_segment_brain_from_cta(cta_image,
-                               report_progress=None,
+                               report_progress=print,
                                debug=False):
-    ImageType = itk.Image[itk.F, 3]
+
+    ImageType = itk.Image[itk.F,3]
     LabelMapType = itk.Image[itk.UC,3]
 
     report_progress("Threshold",5)
@@ -203,13 +208,13 @@ def scv_segment_brain_from_cta(cta_image,
     brainMask = connComp.GetOutput()
 
     report_progress("Finishing",90)
-    cast = itk.CastImageFilter[LabelMapType, ImageType].New()
+    cast = itk.CastImageFilter[LabelMapType,ImageType].New()
     cast.SetInput(brainMask)
     cast.Update()
     brainMaskF = cast.GetOutput()
 
     brainMath = ttk.ImageMath[ImageType,ImageType].New(Input=cta_image)
-    brainMath.ReplaceValuesOutsideMaskRange( brainMaskF, 1, 1, 0)
+    brainMath.ReplaceValuesOutsideMaskRange( brainMaskF,1,1,0)
     cta_brain_image = brainMath.GetOutput()
 
     report_progress("Done",100)
@@ -223,14 +228,15 @@ def scv_segment_brain_from_cta(cta_image,
 #################
 def scv_enhance_vessels_in_cta(cta_image,
                                cta_roi_image,
-                               report_progress=None,
+                               report_progress=print,
                                debug=False ):
-    ImageType = itk.Image[itk.F, 3]
+
+    ImageType = itk.Image[itk.F,3]
     LabelMapType = itk.Image[itk.UC,3]
 
     report_progress("Masking",5)
     imMath = ttk.ImageMath.New(Input=cta_roi_image)
-    imMath.Threshold( 0.00001, 4000, 1, 0)
+    imMath.Threshold( 0.00001,4000,1,0)
     imMath.Erode(10,1,0)
     imBrainMaskErode = imMath.GetOutput()
     imMath.SetInput(cta_roi_image)
@@ -253,7 +259,7 @@ def scv_enhance_vessels_in_cta(cta_image,
     seedCoord = np.zeros([numSeeds,3])
     for i in range(numSeeds):
         seedCoord[i] = np.unravel_index(np.argmax(imBlurArray,
-                           axis=None), imBlurArray.shape)
+                           axis=None),imBlurArray.shape)
         indx = [int(seedCoord[i][0]),int(seedCoord[i][1]),
                 int(seedCoord[i][2])]
         minX = max(indx[0]-seedCoverage,0)
@@ -268,7 +274,7 @@ def scv_enhance_vessels_in_cta(cta_image,
 
     report_progress("Segmenting Initial Vessels",30)
     vSeg = ttk.SegmentTubes.New(Input=cta_roi_image)
-    vSeg.SetVerbose(True)
+    vSeg.SetVerbose(debug)
     vSeg.SetMinRoundness(0.4)
     vSeg.SetMinCurvature(0.002)
     vSeg.SetRadiusInObjectSpace( 1 )
@@ -276,11 +282,11 @@ def scv_enhance_vessels_in_cta(cta_image,
         progress_label = "Vessel "+str(i)+" of "+str(numSeeds)
         progress_percent = i/numSeeds*20+30
         report_progress(progress_label,progress_percent)
-        vSeg.ExtractTubeInObjectSpace( seedCoord[i], i )
+        vSeg.ExtractTubeInObjectSpace( seedCoord[i],i )
     tubeMaskImage = vSeg.GetTubeMaskImage()
 
     imMath.SetInput(tubeMaskImage)
-    imMath.AddImages(cta_roi_image, 200, 1)
+    imMath.AddImages(cta_roi_image,200,1)
     blendIm = imMath.GetOutput()
 
     report_progress("Computing Training Mask",50)
@@ -317,11 +323,11 @@ def scv_enhance_vessels_in_cta(cta_image,
     imBrainE = imMath.GetOutput()
 
     imMath.SetInput(cta_vess)
-    imMath.ReplaceValuesOutsideMaskRange(imBrainE, 1, 1, -0.001)
+    imMath.ReplaceValuesOutsideMaskRange(imBrainE,1,1,-0.001)
     cta_roi_vess = imMath.GetOutput()
 
     report_progress("Done",100)
-    return cta_vess, cta_roi_vess
+    return cta_vess,cta_roi_vess
 
 
 #################
@@ -331,9 +337,10 @@ def scv_enhance_vessels_in_cta(cta_image,
 #################
 def scv_extract_vessels_from_cta(cta_image,
                                  cta_roi_vessels_image,
-                                 report_progress=None,
+                                 report_progress=print,
                                  debug=False,
-                                 output_dir=None):
+                                 output_dir="."):
+
     if output_dir!=None and not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
@@ -342,69 +349,138 @@ def scv_extract_vessels_from_cta(cta_image,
     report_progress("Thresholding",5)
     imMath = ttk.ImageMath.New(cta_roi_vessels_image)
     imMath.MedianFilter(1)
-    imMath.Threshold(0.00000001, 9999, 1, 0)
-    im1VessMask = imMath.GetOutputShort()
+    imMath.Threshold(0.00000001,9999,1,0)
+    vess_mask_im = imMath.GetOutputShort()
+
+    if debug and output_dir!=None:
+        itk.imwrite(vess_mask_im,
+            output_dir+"/extract_vessels_mask.mha",
+            compression=True)
 
     report_progress("Connecting",10)
-    ccSeg = ttk.SegmentConnectedComponents.New(im1VessMask)
+    ccSeg = ttk.SegmentConnectedComponents.New(vess_mask_im)
     ccSeg.SetMinimumVolume(50)
     ccSeg.Update()
-    im1VessMaskCC = ccSeg.GetOutput()
+    vess_mask_cc_im = ccSeg.GetOutput()
 
-    imMathSS = ttk.ImageMath.New(im1VessMaskCC)
+    if debug and output_dir!=None:
+        itk.imwrite(vess_mask_cc_im,
+            output_dir+"/extract_vessels_mask_cc.mha",
+            compression=True)
+
+    imMathSS = ttk.ImageMath.New(vess_mask_cc_im)
     imMathSS.Threshold(0,0,1,0)
-    im1VessMaskInv = imMathSS.GetOutputFloat()
+    vess_mask_inv_im = imMathSS.GetOutputFloat()
     
     report_progress("Filling in",20)
-    distFilter = itk.DanielssonDistanceMapImageFilter.New(im1VessMaskInv)
+    distFilter = itk.DanielssonDistanceMapImageFilter.New(vess_mask_inv_im)
     distFilter.Update()
-    dist = distFilter.GetOutput()
+    dist_map_im = distFilter.GetOutput()
 
     report_progress("Generating seeds",30)
-    imMath.SetInput(dist)
-    imMath.Blur(0.4*spacing)
+    imMath.SetInput(dist_map_im)
+    imMath.Blur(0.5*spacing)
     tmp = imMath.GetOutput()
-    imMath.ReplaceValuesOutsideMaskRange(tmp, 0.1, 10, 0)
-    im1SeedRadius = imMath.GetOutput()
+    # Distance map's distances are in index units, not spacing
+    imMath.ReplaceValuesOutsideMaskRange(tmp,0.333,10,0)
+    initial_radius_im = imMath.GetOutput()
     
-    itk.imwrite(im1SeedRadius, output_dir+"/cta_vessel_seed_radius.mha")
+    if debug and output_dir!=None:
+        itk.imwrite(initial_radius_im,
+            output_dir+"/vessel_extraction_initial_radius.mha",
+            compression=True)
 
     report_progress("Generating input",30)
     imMath.SetInput(cta_image)
-    imMath.ReplaceValuesOutsideMaskRange(cta_roi_vessels_image, 0, 1000, 0)
+    imMath.ReplaceValuesOutsideMaskRange(cta_roi_vessels_image,0,1000,0)
     imMath.Blur(0.4*spacing)
-    imMath.IntensityWindow(0.5,300,0,300)
-    im1Input = imMath.GetOutput()
+    imMath.NormalizeMeanStdDev()
+    imMath.IntensityWindow(-4,4,0,1000)
+    input_im = imMath.GetOutput()
+
+    if debug and output_dir!=None:
+        itk.imwrite(input_im,
+            output_dir+"/vessel_extraction_input.mha",
+            compression=True)
 
     report_progress("Extracting vessels",40)
-    vSeg = ttk.SegmentTubes.New(Input=im1Input)
-    vSeg.SetVerbose(True)
+    vSeg = ttk.SegmentTubes.New(Input=input_im)
+    vSeg.SetVerbose(debug)
     vSeg.SetMinCurvature(0)#.0001)
     vSeg.SetMinRoundness(0.02)
     vSeg.SetMinRidgeness(0.5)
     vSeg.SetMinLevelness(0.0)
-    vSeg.SetRadiusInObjectSpace( 0.8 )
+    vSeg.SetRadiusInObjectSpace( 0.8*spacing )
     vSeg.SetBorderInIndexSpace(3)
-    vSeg.SetSeedMask( im1SeedRadius )
-    #vSeg.SetSeedRadiusMask( im1SeedRadius )
+    vSeg.SetSeedMask( initial_radius_im )
+    #vSeg.SetSeedRadiusMask( initial_radius_im )
     vSeg.SetOptimizeRadius(True)
     vSeg.SetUseSeedMaskAsProbabilities(True)
-    vSeg.SetSeedExtractionMinimumProbability(0.4)
+    # Performs large-to-small vessel extraction using radius as probability
+    vSeg.SetSeedExtractionMinimumProbability(0.99)
     vSeg.ProcessSeeds()
 
     report_progress("Finalizing",90)
     tubeMaskImage = vSeg.GetTubeMaskImage()
 
-    SOWriter = itk.SpatialObjectWriter[3].New()
-    SOWriter.SetInput(vSeg.GetTubeGroup())
-    SOWriter.SetBinaryPoints(True)
-    SOWriter.SetFileName(output_dir+"/cta_vessels.tre")
-    SOWriter.Update()
-
-    VTPWriter = itk.WriteTubesAsPolyData.New()
-    VTPWriter.SetInput(vSeg.GetTubeGroup())
-    VTPWriter.SetFileName(output_dir+"cta_vessels.vtp")
-    VTPWriter.Update()
+    if debug and output_dir!=None:
+        itk.imwrite(tubeMaskImage,
+            output_dir+"/vessel_extraction_output.mha",
+            compression=True)
 
     report_progress("Done",100)
     return tubeMaskImage,vSeg.GetTubeGroup()
+
+def scv_register_atlas_to_image(atlas_im, atlas_mask_im, in_im):
+    ImageType = itk.Image[itk.F,3]
+
+    regAtlasToIn = ttk.RegisterImages[ImageType].New(FixedImage=in_im,
+        MovingImage=atlas_im)
+    regAtlasToIn.SetReportProgress(True)
+    regAtlasToIn.SetRegistration("PIPELINE_AFFINE")
+    regAtlasToIn.SetMetric("MATTES_MI_METRIC")
+    regAtlasToIn.SetInitialMethodEnum("INIT_WITH_IMAGE_CENTERS")
+    regAtlasToIn.Update()
+    atlas_reg_im = regAtlasToIn.ResampleImage()
+    atlas_mask_reg_im = regAtlasToIn.ResampleImage("NEAREST_NEIGHBOR",
+        atlas_mask_im)
+    
+    return atlas_reg_im,atlas_mask_reg_im
+
+def scv_compute_atlas_region_stats(atlas_im,
+                                   time_im,
+                                   vess_im,
+                                   number_of_time_bins=100,
+                                   report_progress=print,
+                                   debug=False):
+
+    atlas_arr = itk.GetArrayFromImage(atlas_im)
+    time_arr = itk.GetArrayFromImage(time_im)
+    vess_arr = itk.GetArrayFromImage(vess_im)
+
+    num_regions = int(atlas_arr.max())
+    time_max = time_arr.max()
+    time_min = time_arr.min()
+    nbins = int(number_of_time_bins)
+    time_factor = (time_max-time_min)/(nbins+1)
+
+    bin_value = np.zeros([num_regions,nbins])
+    bin_count = np.zeros([num_regions,nbins])
+
+    print("Bin value shape = ", bin_value.shape)
+    for atlas_region in range(num_regions):
+        report_progress("Masking",(atlas_region+1)*(100/num_regions))
+        indx_arr = np.where(atlas_arr==atlas_region)
+        indx_list = list(zip(indx_arr[0],indx_arr[1],indx_arr[2]))
+        for indx in indx_list:
+            time_bin = int((time_arr[indx]-time_min)*time_factor)
+            time_bin = min(max(0,time_bin),nbins-1)
+            if np.isnan(vess_arr[indx]) == False:
+                bin_count[atlas_region,time_bin] += 1
+                bin_value[atlas_region,time_bin] += vess_arr[indx]
+
+    bin_label = np.arange(nbins) * time_factor - time_min
+    bin_value = np.divide(bin_value,bin_count,where=bin_count!=0)
+
+    report_progress("Done",100)
+    return bin_label,bin_value,bin_count
