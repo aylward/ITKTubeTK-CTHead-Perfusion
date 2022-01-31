@@ -14,9 +14,25 @@ import webbrowser
 import itk
 from itk import TubeTK as tube
 
-import site
-site.addsitedir('../lib')
+def is_bundled():
+    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+def get_lib_path():
+    if is_bundled():
+        return os.path.join(sys._MEIPASS, 'StroCoVess')
+    return '../lib'
+
+def get_bin_path():
+    if is_bundled():
+        return os.path.join(sys._MEIPASS, 'StroCoVess', 'bin')
+    return '../bin'
+
+def get_atlas_path():
+    if is_bundled():
+        return os.path.join(sys._MEIPASS, 'StroCoVess', 'atlas')
+    return os.path.dirname(os.path.realpath(__file__))
+
+sys.path.append(get_lib_path())
 from StrokeCollateralVessels_Lib import *
 
 class CTP_App(tk.Tk):
@@ -257,8 +273,7 @@ class CTP_App(tk.Tk):
             initialdir=self.dcm_out_dir))
 
     def hdl_dcm_process(self):
-        dcm2niix = os.path.realpath( os.path.pathdir(__file__) +
-            "/bin/dcm2niix.exe")
+        dcm2niix = os.path.realpath( os.path.join(get_bin_path(), 'dcm2niix.exe') )
         subprocess.call([dcm2niix, "-o", self.dcm_out_dir, self.dcm_in_dir])
 
     def hdl_view(self):
@@ -499,10 +514,10 @@ class CTP_App(tk.Tk):
 
         script_dir = os.path.dirname(os.path.realpath(__file__))
         atlas_im = itk.imread(
-            script_dir+"/atlas/atlas_brainweb.mha",
+            os.path.join(get_atlas_path(), 'atlas_brainweb.mha'),
             itk.F)
         atlas_mask_im = itk.imread(
-            script_dir+"/atlas/atlas_brainweb_mask.mha",
+            os.path.join(get_atlas_path(), 'atlas_brainweb_mask.mha'),
             itk.F)
         atlas_reg_im,atlas_mask_reg_im = scv_register_atlas_to_image(
             atlas_im,
