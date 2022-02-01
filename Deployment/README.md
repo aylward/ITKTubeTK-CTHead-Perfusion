@@ -2,25 +2,19 @@
 
 Install the following pip packages:
 ```
-pip install pywin32 pyinstaller==4.7 monai ffmpeg-python av numpy
-pip install --pre itk-tubetk
+pip install pyinstaller==4.7
 ```
 
-Then, install the MONAI extras: https://docs.monai.io/en/latest/installation.html#installing-the-recommended-dependencies.
+Additionally, install ITK and TubeTK python wheels from your desired source.
 
-Finally, build and install itkARGUS from the ARGUS folder in this repo. You will need to follow the ITK python packaging guide for this step.
-Note that it is ideal to install itk-tubetk with the `--pre` flag prior to installing itkARGUS.
-
-Edit the run function in `worker.py` to run your own code.
+You will also need to download and install Inno Setup.
 
 ## build
 
-1. `pyinstaller argus.spec` from within the conda env, and verify that argus.exe works without an env.
-2. Download NSSM and put the 32-bit `nssm.exe` file in this same directory.
-3. Open the inno setup app and compile the final installer.
+1. `cd Deployment; pyinstaller StroCoVess.spec` will build the app. The executable will be generated at `dist/StroCoVess_App/StroCoVess_App.exe`.
+2. Run `StroCoVess_App.exe` to validate the build.
+3. Open Inno Setup, open the `installer.iss` file, and run "Compile". This will generate an installer in the `Output/` folder.
 
-## running
+## install
 
-For dev, you can run `server.py` for the server and `cli.py` for the cli.
-
-For a prod installation, the server will be autostarted for you. All you need to run is `argus-cli` from the command prompt.
+1. Run the installer in `Output/`. This will install a startup menu shortcut called "StrokeCollateralVessels".
