@@ -84,51 +84,14 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
     progress_percent = 20
     progress_per_file = 70/num_images
     for imNum in range(num_images):
-
+        imMoving = itk.imread(filenames[imNum],itk.F)
+        imdataTmp = itk.GetArrayFromImage(imMoving)
+        imdatamax = np.maximum(imdatamax,imdataTmp)
+        imdataTmp = np.where(imdataTmp==-1024,imdatamin,imdataTmp)
+        imdatamin = np.minimum(imdatamin,imdataTmp)
         progress_percent += progress_per_file
-        progress_label = "Registering "+str(imNum)+" of "+str(num_images)
+        progress_label = "Integrating "+str(imNum)+" of "+str(num_images)
         report_progress(progress_label,progress_percent)
-
-        if imNum != num_images//2:
-            imMoving = itk.imread(filenames[imNum],itk.F)
-            immath.SetInput(imMoving)
-            immath.Blur(1)
-            imMovingBlur = immath.GetOutput()
-    
-            imreg = ttk.RegisterImages[ImageType].New()
-            imreg.SetFixedImage(imFixedBlur)
-            imreg.SetMovingImage(imMovingBlur)
-            imreg.SetRigidMaxIterations(100)
-            imreg.SetRegistration("RIGID")
-            imreg.SetExpectedOffsetMagnitude(5)
-            imreg.SetExpectedRotationMagnitude(0.05)
-            imreg.SetFixedImageMaskObject(mask_obj)
-            imreg.SetUseEvolutionaryOptimization(False)
-            if debug:
-                imreg.SetReportProgress(True)
-            imreg.Update()
-    
-            tfm = imreg.GetCurrentMatrixTransform()
-            imMovingReg = imreg.ResampleImage("BSPLINE_INTERPOLATION",
-                                              imMoving,tfm,-1024)
-            if debug and output_dir!=None:
-                pname,fname = os.path.split(filenames[imNum])
-                itk.imwrite(imMovingReg,
-                    output_dir+"/"+fname,
-                    compression=True)
-    
-            imdataTmp = itk.GetArrayFromImage(imMovingReg)
-
-            imdatamax = np.maximum(imdatamax,imdataTmp)
-            imdataTmp = np.where(imdataTmp==-1024,imdatamin,imdataTmp)
-            imdatamin = np.minimum(imdatamin,imdataTmp)
-        elif debug and output_dir!=None:
-            imMoving = itk.imread(filenames[imNum],itk.F)
-            pname,fname = os.path.split(filenames[imNum])
-            itk.imwrite(imMoving,
-                output_dir+"/"+fname,
-                compression=True)
-    
     
     report_progress("Generating CT, CTA, and CTP",90)
 
@@ -430,6 +393,61 @@ def scv_extract_vessels_from_cta(cta_image,
 
     report_progress("Done",100)
     return tubeMaskImage,vSeg.GetTubeGroup()
+
+
+def scv_register_ctp_images(fixed_image_file,
+                        moving_image_files,
+                        output_dir=None,
+                        report_progress=print,
+                        debug=False):
+    ImageType = itk.Image[itk.F,3]
+
+    num_images = len(moving_image_files)
+    progress_percent = 10
+    progress_per_file = 80/num_images
+
+    imFixed = itk.imread(fixed_image_file,itk.F)
+    immath = ttk.ImageMath.New(Input=imFixed)
+    immath.Blur(1)
+    imFixedBlur = immath.GetOutput()
+
+    for imNum in range(num_images):
+        progress_percent += progress_per_file
+        progress_label = "Registering "+str(imNum)+" of "+str(num_images)
+        report_progress(progress_label,progress_percent)
+    
+        if moving_image_files[imNum] != fixed_image_file:
+            imMoving = itk.imread(moving_image_files[imNum],itk.F)
+            immath.SetInput(imMoving)
+            immath.Blur(1)
+            imMovingBlur = immath.GetOutput()
+    
+            imreg = ttk.RegisterImages[ImageType].New()
+            imreg.SetFixedImage(imFixedBlur)
+            imreg.SetMovingImage(imMovingBlur)
+            imreg.SetRigidMaxIterations(100)
+            imreg.SetRegistration("RIGID")
+            imreg.SetExpectedOffsetMagnitude(5)
+            imreg.SetExpectedRotationMagnitude(0.05)
+            #imreg.SetFixedImageMaskObject(mask_obj)
+            imreg.SetUseEvolutionaryOptimization(False)
+            if debug:
+                imreg.SetReportProgress(True)
+            imreg.Update()
+    
+            tfm = imreg.GetCurrentMatrixTransform()
+            imMovingReg = imreg.ResampleImage("BSPLINE_INTERPOLATION",
+                                              imMoving,tfm,-1024)
+            if output_dir!=None:
+                pname,fname = os.path.split(moving_image_files[imNum])
+                itk.imwrite(imMovingReg,
+                    output_dir+"/"+fname,
+                    compression=True)
+        elif output_dir!=None:
+            pname,fname = os.path.split(moving_image_files[imNum])
+            itk.imwrite(imMoving,
+                output_dir+"/"+fname,
+                compression=True)
 
 def scv_register_atlas_to_image(atlas_im, atlas_mask_im, in_im):
     ImageType = itk.Image[itk.F,3]

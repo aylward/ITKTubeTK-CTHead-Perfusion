@@ -40,21 +40,14 @@ class CTP_App(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.ctp_files = ["../data/CTP/CTP04.mha",
-                          "../data/CTP/CTP06.mha",
-                          "../data/CTP/CTP08.mha",
-                          "../data/CTP/CTP10.mha",
+        self.ctp_files = ["../data/CTP/CTP06.mha",
+                          "../data/CTP/CTP09.mha",
                           "../data/CTP/CTP12.mha",
-                          "../data/CTP/CTP14.mha",
-                          "../data/CTP/CTP16.mha",
+                          "../data/CTP/CTP15.mha",
                           "../data/CTP/CTP18.mha",
-                          "../data/CTP/CTP20.mha",
-                          "../data/CTP/CTP22.mha",
+                          "../data/CTP/CTP21.mha",
                           "../data/CTP/CTP24.mha",
-                          "../data/CTP/CTP26.mha",
-                          "../data/CTP/CTP28.mha",
-                          "../data/CTP/CTP30.mha",
-                          "../data/CTP/CTP32.mha"]
+                          "../data/CTP/CTP27.mha"]
 
         self.cta_file = ""
         self.dsa_file = ""
@@ -66,6 +59,10 @@ class CTP_App(tk.Tk):
 
         self.dcm_in_dir = "./"
         self.dcm_out_dir = "./"
+
+        self.reg_in_files = self.ctp_files
+        self.reg_fixed_image = self.ctp_files[3]
+        self.reg_out_dir = "./"
 
         self.process_out_dir = "./results"
 
@@ -90,6 +87,11 @@ class CTP_App(tk.Tk):
         btn_dcm = tk.Button(master=frm_utility,
             text="Convert DICOM files",
             command=self.hdl_dcm,
+            width=20
+            ).pack(pady=5)
+        btn_register = tk.Button(master=frm_utility,
+            text="Register CTP images",
+            command=self.hdl_reg,
             width=20
             ).pack(pady=5)
         btn_view = tk.Button(master=frm_utility,
@@ -246,21 +248,21 @@ class CTP_App(tk.Tk):
         frm_title = tk.Frame(master=win_dcm)
         lbl_title = tk.Label(master=frm_title,
             text="DICOM Conversion",
-            pady=5).pack()
+            pady=5).pack(padx=5,pady=5)
         frm_title.pack(fill=tk.BOTH)
 
         btn_dcm_in_dir = tk.Button(master=win_dcm,
             text="1) Set input directory",
             command=self.hdl_dcm_in_dir,
-            width=20).pack()
+            width=20).pack(padx=5,pady=5)
         btn_dcm_out_dir = tk.Button(master=win_dcm,
             text="2) Set output directory",
             command=self.hdl_dcm_out_dir,
-            width=20).pack()
+            width=20).pack(padx=5,pady=5)
         btn_dcm_process = tk.Button(master=win_dcm,
             text="3) Process",
             command=self.hdl_dcm_process,
-            width=20).pack()
+            width=20).pack(padx=5,pady=5)
 
         win_dcm.mainloop()
 
@@ -275,6 +277,62 @@ class CTP_App(tk.Tk):
     def hdl_dcm_process(self):
         dcm2niix = os.path.realpath( os.path.join(get_bin_path(), 'dcm2niix.exe') )
         subprocess.call([dcm2niix, "-o", self.dcm_out_dir, self.dcm_in_dir])
+
+    def hdl_reg(self):
+        win_reg = tk.Tk()
+
+        frm_title = tk.Frame(master=win_reg)
+        lbl_title = tk.Label(master=frm_title,
+            text="Image Registration",
+            pady=5).pack(padx=5,pady=5)
+        frm_title.pack(fill=tk.BOTH)
+
+        btn_reg_in_files = tk.Button(master=win_reg,
+            text="1) Set input files",
+            command=self.hdl_reg_in_files,
+            width=20).pack(padx=5,pady=5)
+        btn_reg_fixed_image = tk.Button(master=win_reg,
+            text="2) Set fixed image",
+            command=self.hdl_reg_fixed_image,
+            width=20).pack(padx=5,pady=5)
+        btn_reg_out_dir = tk.Button(master=win_reg,
+            text="3) Set output directory",
+            command=self.hdl_reg_out_dir,
+            width=20).pack(padx=5,pady=5)
+        btn_reg_process = tk.Button(master=win_reg,
+            text="4) Process",
+            command=self.hdl_reg_process,
+            width=20).pack(padx=5,pady=5)
+
+        win_reg.mainloop()
+
+    def hdl_reg_in_files(self):
+        filepath,filename = os.path.split(self.reg_in_files[0])
+        self.reg_in_files = tk.filedialog.askopenfilenames(
+            initialdir=filepath)
+        if len(self.reg_in_files)>0:
+            mid_file = len(self.reg_in_files)//2
+            self.reg_fixed_image = self.reg_in_files[mid_file]
+
+    def hdl_reg_fixed_image(self):
+        filepath,filename = os.path.split(self.reg_fixed_image)
+        self.reg_fixed_image = os.path.realpath(
+            tk.filedialog.askopenfilename(
+                initialdir=filepath,
+                initialfile=filename))
+
+    def hdl_reg_out_dir(self):
+        self.reg_out_dir = os.path.realpath(tk.filedialog.askdirectory(
+            initialdir=self.reg_out_dir))
+
+    def hdl_reg_process(self):
+        self.report_progress("Registering images",5)
+        scv_register_ctp_images(self.reg_fixed_image,
+            self.reg_in_files,
+            output_dir=self.reg_out_dir,
+            report_progress=self.report_subprogress,
+            debug=self.debug.get())
+        self.report_progress("Done!",100)
 
     def hdl_view(self):
         view_file = os.path.realpath(tk.filedialog.askopenfilename())
@@ -375,10 +433,6 @@ class CTP_App(tk.Tk):
         if not os.path.exists(self.process_out_dir):
             os.mkdir(self.process_out_dir)
 
-        debug = False
-        if self.debug.get() == 1:
-            debug = True
-
         # User must supply either CTA or CTP data
         # They can also provide DSA data, but it must have had
         #    the brain extracted already.
@@ -391,7 +445,7 @@ class CTP_App(tk.Tk):
                 os.mkdir(ctp_reg_output_dir)
             ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(self.ctp_files,
                 report_progress = self.report_subprogress,
-                debug=debug,
+                debug=self.debug.get(),
                 output_dir=ctp_reg_output_dir)
             self.report_progress("Converting CTP to CTA",10)
             itk.imwrite(ct_im,self.process_out_dir+"/ct.mha",
@@ -425,7 +479,7 @@ class CTP_App(tk.Tk):
             if cta_im != None:
                 cta_brain_im = scv_segment_brain_from_cta(cta_im,
                     report_progress = self.report_subprogress,
-                    debug=debug)
+                    debug=self.debug.get())
                 itk.imwrite(cta_brain_im,
                     self.process_out_dir+"/cta_brain.mha",
                     compression=True)
@@ -469,7 +523,7 @@ class CTP_App(tk.Tk):
                 in_im,
                 in_brain_im,
                 report_progress=self.report_subprogress,
-                debug=debug)
+                debug=self.debug.get())
             if self.skip_brain_segmentation.get() == 0:
                 itk.imwrite(in_vess_im,
                     self.process_out_dir+"/"+in_name+"_vessels_enhanced.mha",
@@ -486,7 +540,7 @@ class CTP_App(tk.Tk):
             in_vess_im,
             in_brain_vess_im,
             report_progress=self.report_subprogress,
-            debug=debug,
+            debug=self.debug.get(),
             output_dir=self.process_out_dir)
 
         brain_name = ""
