@@ -1,0 +1,1 @@
+@"%~dp0\..\argus\argus-cli.exe" %*
