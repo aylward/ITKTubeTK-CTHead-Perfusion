@@ -25,58 +25,19 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
     base_im = itk.imread(filenames[num_images//2],itk.F)
     base_spacing = base_im.GetSpacing()
 
-    if base_spacing[0] != base_spacing[1] or \
-            base_spacing[1] != base_spacing[2]:
-        report_progress("Converting CTP: Resampling",0)
-        resample = ttk.ResampleImage.New(Input=base_im)
-        resample.SetMakeIsotropic(True)
-        resample.Update()
-        base_iso_im = resample.GetOutput()
-        if debug:
-            progress_label = "DEBUG: Resampling to "+str(
-                base_iso_im.GetSpacing())
-            report_progress(progress_label,10)
-    else:
-        report_progress("Converting CTP: Already isotropic",0)
-        base_iso_im = base_im
-
     progress_percent = 10
-    report_progress("Creating mask",progress_percent)
+    report_progress("Reading images",progress_percent)
 
-    immath = ttk.ImageMath.New(Input=base_iso_im)
-    immath.Blur(1)
-    base_blur_im = immath.GetOutput()
-
-    immath.Threshold(150,800,1,0)
-    immath.Dilate(10,1,0)
-    base_mask_im = immath.GetOutputUChar()
-    if debug and output_dir!=None:
-        itk.imwrite(base_mask_im,
-            output_dir+"/mask.mha",
-            compression=True)
-
-    base_mask_array = itk.GetArrayViewFromImage(base_mask_im)
-    base_mask_array[0:4,:,:] = 0
-    sizeZ = base_mask_array.shape[0]
-    base_mask_array[sizeZ-4:sizeZ,:,:] = 0
-    #No need to update mask0 since mask0Tmp is a view of mask0
-    
-    mask_obj = itk.ImageMaskSpatialObject[3].New()
-    mask_obj.SetImage(base_mask_im)
-    mask_obj.Update()
-    
     Dimension = 3
     PixelType = itk.ctype('float')
     ImageType = itk.Image[PixelType,Dimension]
 
-    imdatamax = itk.GetArrayFromImage(base_iso_im)
+    imdatamax = itk.GetArrayFromImage(base_im)
     imdatamin = imdatamax
     imdatamax2 = imdatamax
     imdatamin2 = imdatamax
     imdatamax3 = imdatamax
     imdatamin3 = imdatamax
-
-    imFixedBlur = base_blur_im
 
     if output_dir!=None and not os.path.exists(output_dir):
         os.mkdir(output_dir)
@@ -84,62 +45,32 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
     progress_percent = 20
     progress_per_file = 70/num_images
     for imNum in range(num_images):
-
+        imMoving = itk.imread(filenames[imNum],itk.F)
+        if imMoving.shape != base_im.shape:
+            resample = ttk.ResampleImage.New(Input=imMoving)
+            resample.SetMatchImage(base_im)
+            resample.Update()
+            imMovingIso = resample.GetOutput()
+        else:
+            imMovingIso = imMoving
+        imdataTmp = itk.GetArrayFromImage(imMovingIso)
+        imdatamax = np.maximum(imdatamax,imdataTmp)
+        imdataTmp = np.where(imdataTmp==-1024,imdatamin,imdataTmp)
+        imdatamin = np.minimum(imdatamin,imdataTmp)
         progress_percent += progress_per_file
-        progress_label = "Registering "+str(imNum)+" of "+str(num_images)
+        progress_label = "Integrating "+str(imNum)+" of "+str(num_images)
         report_progress(progress_label,progress_percent)
-
-        if imNum != num_images//2:
-            imMoving = itk.imread(filenames[imNum],itk.F)
-            immath.SetInput(imMoving)
-            immath.Blur(1)
-            imMovingBlur = immath.GetOutput()
-    
-            imreg = ttk.RegisterImages[ImageType].New()
-            imreg.SetFixedImage(imFixedBlur)
-            imreg.SetMovingImage(imMovingBlur)
-            imreg.SetRigidMaxIterations(100)
-            imreg.SetRegistration("RIGID")
-            imreg.SetExpectedOffsetMagnitude(5)
-            imreg.SetExpectedRotationMagnitude(0.05)
-            imreg.SetFixedImageMaskObject(mask_obj)
-            imreg.SetUseEvolutionaryOptimization(False)
-            if debug:
-                imreg.SetReportProgress(True)
-            imreg.Update()
-    
-            tfm = imreg.GetCurrentMatrixTransform()
-            imMovingReg = imreg.ResampleImage("BSPLINE_INTERPOLATION",
-                                              imMoving,tfm,-1024)
-            if debug and output_dir!=None:
-                pname,fname = os.path.split(filenames[imNum])
-                itk.imwrite(imMovingReg,
-                    output_dir+"/"+fname,
-                    compression=True)
-    
-            imdataTmp = itk.GetArrayFromImage(imMovingReg)
-
-            imdatamax = np.maximum(imdatamax,imdataTmp)
-            imdataTmp = np.where(imdataTmp==-1024,imdatamin,imdataTmp)
-            imdatamin = np.minimum(imdatamin,imdataTmp)
-        elif debug and output_dir!=None:
-            imMoving = itk.imread(filenames[imNum],itk.F)
-            pname,fname = os.path.split(filenames[imNum])
-            itk.imwrite(imMoving,
-                output_dir+"/"+fname,
-                compression=True)
-    
     
     report_progress("Generating CT, CTA, and CTP",90)
 
     ct = itk.GetImageFromArray(imdatamin)
-    ct.CopyInformation(base_iso_im)
+    ct.CopyInformation(base_im)
 
     cta = itk.GetImageFromArray(imdatamax)
-    cta.CopyInformation(base_iso_im)
+    cta.CopyInformation(base_im)
 
     dsa = itk.GetImageFromArray(imdatamax - imdatamin)
-    dsa.CopyInformation(base_iso_im)
+    dsa.CopyInformation(base_im)
 
     report_progress("Done",100)
     return ct,cta,dsa
@@ -213,7 +144,7 @@ def scv_segment_brain_from_cta(cta_image,
     cast.Update()
     brainMaskF = cast.GetOutput()
 
-    brainMath = ttk.ImageMath[ImageType,ImageType].New(Input=cta_image)
+    brainMath = ttk.ImageMath[ImageType].New(Input=cta_image)
     brainMath.ReplaceValuesOutsideMaskRange( brainMaskF,1,1,0)
     cta_brain_image = brainMath.GetOutput()
 
@@ -247,7 +178,7 @@ def scv_enhance_vessels_in_cta(cta_image,
     spacing = cta_image.GetSpacing()[0]
 
     report_progress("Blurring",10)
-    imMath = ttk.ImageMath[ImageType,ImageType].New()
+    imMath = ttk.ImageMath[ImageType].New()
     imMath.SetInput(imBrainErode)
     imMath.Blur(1.5*spacing)
     imBlur = imMath.GetOutput()
@@ -430,6 +361,76 @@ def scv_extract_vessels_from_cta(cta_image,
 
     report_progress("Done",100)
     return tubeMaskImage,vSeg.GetTubeGroup()
+
+
+def scv_register_ctp_images(fixed_image_file,
+                        moving_image_files,
+                        output_dir,
+                        report_progress=print,
+                        debug=False):
+    ImageType = itk.Image[itk.F,3]
+
+    num_images = len(moving_image_files)
+    progress_percent = 10
+    progress_per_file = 80/num_images
+
+    fixed_im = itk.imread(fixed_image_file,itk.F)
+    fixed_im_spacing = fixed_im.GetSpacing()
+    if fixed_im_spacing[0] != fixed_im_spacing[1] or \
+       fixed_im_spacing[1] != fixed_im_spacing[2]:
+        report_progress("Registering CTP: Resampling",0)
+        resample = ttk.ResampleImage.New(Input=fixed_im)
+        resample.SetMakeIsotropic(True)
+        resample.Update()
+        fixed_im = resample.GetOutput()
+        if debug:
+            progress_label = "DEBUG: Resampling to "+str(
+                fixed_im.GetSpacing())
+            report_progress(progress_label,10)
+    else:
+        report_progress("Converting CTP: Already isotropic",10)
+
+    immath = ttk.ImageMath.New(Input=fixed_im)
+    immath.Blur(1)
+    fixed_blur_im = immath.GetOutput()
+
+    for imNum in range(num_images):
+        progress_percent += progress_per_file
+        progress_label = "Registering "+str(imNum)+" of "+str(num_images)
+        report_progress(progress_label,progress_percent)
+    
+        if moving_image_files[imNum] != fixed_image_file:
+            moving_im = itk.imread(moving_image_files[imNum],itk.F)
+            immath.SetInput(moving_im)
+            immath.Blur(1)
+            moving_blur_im = immath.GetOutput()
+    
+            imreg = ttk.RegisterImages[ImageType].New()
+            imreg.SetFixedImage(fixed_blur_im)
+            imreg.SetMovingImage(moving_blur_im)
+            imreg.SetRigidMaxIterations(100)
+            imreg.SetRegistration("RIGID")
+            imreg.SetExpectedOffsetMagnitude(5)
+            imreg.SetExpectedRotationMagnitude(0.05)
+            #imreg.SetFixedImageMaskObject(mask_obj)
+            imreg.SetUseEvolutionaryOptimization(False)
+            if debug:
+                imreg.SetReportProgress(True)
+            imreg.Update()
+    
+            tfm = imreg.GetCurrentMatrixTransform()
+            moving_reg_im = imreg.ResampleImage("BSPLINE_INTERPOLATION",
+                                                moving_im,tfm,-1024)
+            if output_dir!=None:
+                pname,fname = os.path.split(moving_image_files[imNum])
+                itk.imwrite(moving_reg_im,
+                    output_dir+"/"+fname,
+                    compression=True)
+        elif output_dir!=None:
+            pname,fname = os.path.split(moving_image_files[imNum])
+            itk.imwrite(fixed_im,
+                output_dir+"/"+fname,
+                compression=True)
 
 def scv_register_atlas_to_image(atlas_im, atlas_mask_im, in_im):
     ImageType = itk.Image[itk.F,3]
