@@ -17,6 +17,6 @@ datas = [
     (path.join(pkgpath, '*.pyd'), 'itk'),
 ]
 
-binaries = [
-    (path.join(from_site('itk_core.libs'), '*.dll'), 'itk_core.libs'),
-]
+binaries = []
+    #(path.join(from_site('itk_core.libs'), '*.dll'), 'itk_core.libs'),
+#]
