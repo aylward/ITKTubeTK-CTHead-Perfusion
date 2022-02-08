@@ -34,10 +34,6 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
 
     imdatamax = itk.GetArrayFromImage(base_im)
     imdatamin = imdatamax
-    imdatamax2 = imdatamax
-    imdatamin2 = imdatamax
-    imdatamax3 = imdatamax
-    imdatamin3 = imdatamax
 
     if output_dir!=None and not os.path.exists(output_dir):
         os.mkdir(output_dir)
@@ -51,6 +47,8 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
             resample.SetMatchImage(base_im)
             resample.Update()
             imMovingIso = resample.GetOutput()
+            progress_label = "Resampling "+str(imNum)+" of "+str(num_images)
+            report_progress(progress_label,progress_percent)
         else:
             imMovingIso = imMoving
         imdataTmp = itk.GetArrayFromImage(imMovingIso)
@@ -69,7 +67,14 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
     cta = itk.GetImageFromArray(imdatamax)
     cta.CopyInformation(base_im)
 
-    dsa = itk.GetImageFromArray(imdatamax - imdatamin)
+    diff = imdatamax-imdatamin
+    diff[:4,:,:] = 0
+    diff[-4:,:,:] = 0
+    diff[:,:4,:] = 0
+    diff[:,-4:,:] = 0
+    diff[:,:,:4] = 0
+    diff[:,:,-4:] = 0
+    dsa = itk.GetImageFromArray(diff)
     dsa.CopyInformation(base_im)
 
     report_progress("Done",100)
@@ -239,17 +244,22 @@ def scv_enhance_vessels_in_cta(cta_image,
     enhancer.SetUnknownId( 0 )
     enhancer.SetTrainClassifier(True)
     enhancer.SetUseIntensityOnly(True)
-    enhancer.SetScales([0.5*spacing,1.5*spacing,4*spacing])
+    enhancer.SetScales([0.75*spacing,2*spacing,6*spacing])
     enhancer.Update()
     enhancer.ClassifyImages()
 
     report_progress("Finalizing",90)
-    cta_vess = itk.SubtractImageFilter(
-                  Input1=enhancer.GetClassProbabilityImage(0),
-                  Input2=enhancer.GetClassProbabilityImage(1))
+    imMath = ttk.ImageMath[ImageType].New()
+    imMath.SetInput(enhancer.GetClassProbabilityImage(0))
+    imMath.Blur(0.5*spacing)
+    prob0 = imMath.GetOutput()
+    imMath.SetInput(enhancer.GetClassProbabilityImage(1))
+    imMath.Blur(0.5*spacing)
+    prob1 = imMath.GetOutput()
+    cta_vess = itk.SubtractImageFilter(Input1=prob0, Input2=prob1)
 
     imMath.SetInput(cta_roi_image)
-    imMath.Threshold(0.0001,2000,1,0)
+    imMath.Threshold(0.0000001,2000,1,0)
     imMath.Erode(2,1,0)
     imBrainE = imMath.GetOutput()
 
@@ -378,7 +388,7 @@ def scv_register_ctp_images(fixed_image_file,
     fixed_im_spacing = fixed_im.GetSpacing()
     if fixed_im_spacing[0] != fixed_im_spacing[1] or \
        fixed_im_spacing[1] != fixed_im_spacing[2]:
-        report_progress("Registering CTP: Resampling",0)
+        report_progress("Resampling",10)
         resample = ttk.ResampleImage.New(Input=fixed_im)
         resample.SetMakeIsotropic(True)
         resample.Update()
@@ -387,12 +397,21 @@ def scv_register_ctp_images(fixed_image_file,
             progress_label = "DEBUG: Resampling to "+str(
                 fixed_im.GetSpacing())
             report_progress(progress_label,10)
-    else:
-        report_progress("Converting CTP: Already isotropic",10)
 
-    immath = ttk.ImageMath.New(Input=fixed_im)
-    immath.Blur(1)
-    fixed_blur_im = immath.GetOutput()
+    imMath = ttk.ImageMath.New(fixed_im)
+    imMath.Threshold(150,800,1,0)
+    imMath.Dilate(10,1,0)
+    mask_im = imMath.GetOutputUChar()
+    mask_array = itk.GetArrayViewFromImage(mask_im)
+    mask_array[:4,:,:] = 0
+    mask_array[-4:,:,:] = 0
+    mask_obj = itk.ImageMaskSpatialObject[3].New()
+    mask_obj.SetImage(mask_im)
+    mask_obj.Update()
+    if debug and output_dir!=None:
+        itk.imwrite(base_mask_im,
+            output_dir+"/mask.mha",
+            compression=True)
 
     for imNum in range(num_images):
         progress_percent += progress_per_file
@@ -401,25 +420,22 @@ def scv_register_ctp_images(fixed_image_file,
     
         if moving_image_files[imNum] != fixed_image_file:
             moving_im = itk.imread(moving_image_files[imNum],itk.F)
-            immath.SetInput(moving_im)
-            immath.Blur(1)
-            moving_blur_im = immath.GetOutput()
     
             imreg = ttk.RegisterImages[ImageType].New()
-            imreg.SetFixedImage(fixed_blur_im)
-            imreg.SetMovingImage(moving_blur_im)
+            imreg.SetFixedImage(fixed_im)
+            imreg.SetMovingImage(moving_im)
             imreg.SetRigidMaxIterations(100)
             imreg.SetRegistration("RIGID")
             imreg.SetExpectedOffsetMagnitude(5)
             imreg.SetExpectedRotationMagnitude(0.05)
-            #imreg.SetFixedImageMaskObject(mask_obj)
+            imreg.SetFixedImageMaskObject(mask_obj)
             imreg.SetUseEvolutionaryOptimization(False)
             if debug:
                 imreg.SetReportProgress(True)
             imreg.Update()
     
             tfm = imreg.GetCurrentMatrixTransform()
-            moving_reg_im = imreg.ResampleImage("BSPLINE_INTERPOLATION",
+            moving_reg_im = imreg.ResampleImage("SINC_INTERPOLATION",
                                                 moving_im,tfm,-1024)
             if output_dir!=None:
                 pname,fname = os.path.split(moving_image_files[imNum])
@@ -468,7 +484,6 @@ def scv_compute_atlas_region_stats(atlas_im,
     bin_value = np.zeros([num_regions,nbins])
     bin_count = np.zeros([num_regions,nbins])
 
-    print("Bin value shape = ", bin_value.shape)
     for atlas_region in range(num_regions):
         report_progress("Masking",(atlas_region+1)*(100/num_regions))
         indx_arr = np.where(atlas_arr==atlas_region)
