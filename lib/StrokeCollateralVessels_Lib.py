@@ -409,7 +409,7 @@ def scv_register_ctp_images(fixed_image_file,
     mask_obj.SetImage(mask_im)
     mask_obj.Update()
     if debug and output_dir!=None:
-        itk.imwrite(base_mask_im,
+        itk.imwrite(mask_im,
             output_dir+"/mask.mha",
             compression=True)
 
