@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -15,7 +16,8 @@ import numpy as np
 #################
 #################
 #################
-def scv_convert_ctp_to_cta(filenames,report_progress=print,
+def scv_convert_ctp_to_cta(filenames,
+                           report_progress=print,
                            debug=False,
                            output_dir="."):
 
@@ -86,7 +88,7 @@ def scv_convert_ctp_to_cta(filenames,report_progress=print,
 #################
 #################
 #################
-def scv_segment_brain_from_cta(cta_image,
+def scv_segment_brain_from_ct(ct_image,
                                report_progress=print,
                                debug=False):
 
@@ -408,10 +410,6 @@ def scv_register_ctp_images(fixed_image_file,
     mask_obj = itk.ImageMaskSpatialObject[3].New()
     mask_obj.SetImage(mask_im)
     mask_obj.Update()
-    if debug and output_dir!=None:
-        itk.imwrite(mask_im,
-            output_dir+"/mask.mha",
-            compression=True)
 
     for imNum in range(num_images):
         progress_percent += progress_per_file
@@ -439,8 +437,11 @@ def scv_register_ctp_images(fixed_image_file,
                                                 moving_im,tfm,-1024)
             if output_dir!=None:
                 pname,fname = os.path.split(moving_image_files[imNum])
+                suffix = Path(fname).suffixA
+                new_suffix = "_reg"+suffix
+                new_fname = Path(fname).with_suffix(new_suffix)
                 itk.imwrite(moving_reg_im,
-                    output_dir+"/"+fname,
+                    output_dir+"/"+new_fname,
                     compression=True)
         elif output_dir!=None:
             pname,fname = os.path.split(moving_image_files[imNum])
