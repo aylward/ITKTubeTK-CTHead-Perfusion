@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import pathlib
+from pathlib import Path
 import csv
 
 import tkinter as tk
@@ -49,6 +50,7 @@ class CTP_App(tk.Tk):
                           "../data/CTP/CTP24.mha",
                           "../data/CTP/CTP27.mha"]
 
+        self.ct_file = ""
         self.cta_file = ""
         self.dsa_file = ""
 
@@ -63,6 +65,9 @@ class CTP_App(tk.Tk):
         self.reg_in_files = self.ctp_files
         self.reg_fixed_image = self.ctp_files[3]
         self.reg_out_dir = "./"
+
+        self.prep_ctp_4d_in_file = "./results/CTP.dcm"
+        self.prep_ctp_4d_out_dir = "./results"
 
         self.process_out_dir = "./results"
 
@@ -93,6 +98,11 @@ class CTP_App(tk.Tk):
         btn_dcm = tk.Button(master=frm_utility,
             text="Convert DICOM files",
             command=self.hdl_dcm,
+            width=20
+            ).pack(pady=5)
+        btn_prep_ctp_4d = tk.Button(master=frm_utility,
+            text="Prep for PerfusionToolbox",
+            command=self.hdl_prep_ctp_4d,
             width=20
             ).pack(pady=5)
         btn_register = tk.Button(master=frm_utility,
@@ -270,10 +280,12 @@ class CTP_App(tk.Tk):
 
     def hdl_dcm_in_dir(self):
         self.dcm_in_dir = os.path.realpath(tk.filedialog.askdirectory(
+            title='Dicom input directory',
             initialdir=self.dcm_in_dir))
 
     def hdl_dcm_out_dir(self):
         self.dcm_out_dir = os.path.realpath(tk.filedialog.askdirectory(
+            title='Output directory',
             initialdir=self.dcm_out_dir))
 
     def hdl_dcm_process(self):
@@ -312,6 +324,7 @@ class CTP_App(tk.Tk):
     def hdl_reg_in_files(self):
         filepath,filename = os.path.split(self.reg_in_files[0])
         self.reg_in_files = tk.filedialog.askopenfilenames(
+            title='Input (moving) image files to be registered',
             initialdir=filepath)
         if len(self.reg_in_files)>0:
             mid_file = len(self.reg_in_files)//2
@@ -321,11 +334,13 @@ class CTP_App(tk.Tk):
         filepath,filename = os.path.split(self.reg_fixed_image)
         self.reg_fixed_image = os.path.realpath(
             tk.filedialog.askopenfilename(
+                title='Baseline (fixed) image file',
                 initialdir=filepath,
                 initialfile=filename))
 
     def hdl_reg_out_dir(self):
         self.reg_out_dir = os.path.realpath(tk.filedialog.askdirectory(
+            title='Output directory',
             initialdir=self.reg_out_dir))
 
     def hdl_reg_process(self):
@@ -340,14 +355,130 @@ class CTP_App(tk.Tk):
             debug=debug)
         self.report_progress("Done!",100)
 
+    def hdl_prep_ctp_4d(self):
+        win_prep_ctp_4d = tk.Tk()
+
+        frm_title = tk.Frame(master=win_prep_ctp_4d)
+        lbl_title = tk.Label(master=frm_title,
+            text="Prepare 4D CTP for perfusion toolbox",
+            pady=5).pack(padx=5,pady=5)
+        frm_title.pack(fill=tk.BOTH)
+
+        btn_prep_ctp_4d_in_file = tk.Button(master=win_prep_ctp_4d,
+            text="1) Set input file",
+            command=self.hdl_prep_ctp_4d_in_file,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_ctp_4d_out_dir = tk.Button(master=win_prep_ctp_4d,
+            text="2) Set output directory",
+            command=self.hdl_prep_ctp_4d_out_dir,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_ctp_4d_process = tk.Button(master=win_prep_ctp_4d,
+            text="3) Process",
+            command=self.hdl_prep_ctp_4d_process,
+            bg="pale green",
+            width=20).pack(padx=5,pady=5)
+
+        win_prep_ctp_4d.mainloop()
+
+    def hdl_prep_ctp_4d_in_file(self):
+        filepath,filename = os.path.split(self.prep_ctp_4d_in_file)
+        self.prep_ctp_4d_in_file = tk.filedialog.askopenfilename(
+            title='4D CTP file to be prepared',
+            initialdir=filepath,
+            initialfile=filename)
+
+    def hdl_prep_ctp_4d_out_dir(self):
+        self.prep_ctp_4d_out_dir = os.path.realpath(
+            tk.filedialog.askdirectory(
+            title='Output directory',
+            initialdir=self.prep_ctp_4d_out_dir))
+
+    def hdl_prep_ctp_4d_process(self):
+        self.report_progress("Preparing 4D CTP image",5)
+        debug = False
+        if self.debug.get() == 1:
+            debug = True
+
+        # convert 4D ctp to 3D images
+        self.prep_ctp_4d_out_dir 
+        ctp_dir,ctp_filename = os.path.split(
+            self.prep_ctp_4d_in_file)
+        new_filename_base = Path(os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, ctp_filename)))
+        img4d_im = itk.imread(self.prep_ctp_4d_in_file, itk.F)
+        img4d_array = itk.GetArrayFromImage(img4d_im)
+        img4d_shape = img4d_array.shape
+        num_3d_files = img4d_shape[0]
+        new_filenames = np.empty([num_3d_files])
+        for i in range(num_3d_files):
+            new_suffix = f'{i:03}.mha'
+            new_filenames[i] = new_filename_base.with_suffix(new_suffix)
+            img3d_array = img4d[i,:,:,:]
+            img3d_im = itk.GetImageFromArray(img3d_array)
+            itk.imwrite(img3d_im, new_filenames[i])
+        self.reg_fixed_image = new_filesnames[num_3d_files//2]
+        self.reg_in_files = new_filenames
+        scv_register_ctp_images(self.reg_fixed_image,
+            self.reg_in_files,
+            output_dir=self.pre_ctp_4d_out_dir,
+            report_progress=self.report_subprogress,
+            debug=debug)
+
+        # update filenames to registered ctp
+        for i in range(num_3d_files):
+            suffix = Path(new_filenames[i]).suffix
+            new_suffix = "_reg"+suffix
+            new_filenames[i] = Path(new_filenames[i]).with_suffix(new_suffix)
+        # Write 4D ctp registered
+        img3d_im = itk.imread(new_filenames[0],itk.F)
+        img3d_array = itk.GetArrayFromImage(img3d_im)
+        img4d_shape[1:3] = img3d_array.shape
+        img4d_array = np.empty(img4d_shape)
+        for i,new_file in enumerate(new_filenames):
+            img3d_im = itk.imread(new_file)
+            img3d_array = itk.GetArrayFromImage(igm3d_im)
+            img4d_array[i,:,:,:] = img3d_array
+        img4d_im = itk.GetImageFromArray(img4d_array)
+        suffix = Path(ctp_filename).suffix
+        new_suffix = "_reg"+suffix
+        new_ctp_filename = Path(ctp_filename).with_suffix(new_suffix)
+        new_ctp_4d_out_filename = os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, new_ctp_filename))
+        itk.imwrite(img4d_im, new_ctp_4d_out_filename)
+        
+        # Compute CT, CTA, DSA
+        ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(new_filenames,
+            report_progress = self.report_subprogress,
+            debug=debug,
+            output_dir=self.pre_ctp_4d_out_dir)
+        suffix = Path(ctp_filename).suffix
+        new_suffix = "_ct"+suffix
+        ct_filename = Path(ctp_filename).with_suffix(new_suffix)
+        itk.imwrite(ct_im, ct_filename)
+        new_suffix = "_cta"+suffix
+        cta_filename = Path(ctp_filename).with_suffix(new_suffix)
+        itk.imwrite(cta_im, cta_filename)
+        new_suffix = "_dsa"+suffix
+        dsa_filename = Path(ctp_filename).with_suffix(new_suffix)
+        itk.imwrite(dsa_im, dsa_filename)
+
+        # Segment brain from CT
+        ct_brain = scv_segment_brain_from_ct(ct_im,
+            report_progress = self.report_subprogress,
+            debug=debug)
+        suffix = Path(ct_filename).suffix
+        new_suffix = "_brain"+suffix
+        ct_brain_filename = Path(ct_filename).with_suffix(new_suffix)
+        itk.imwrite(ct_brain, ct_brain_filename)
+
     def hdl_view(self):
-        view_file = os.path.realpath(tk.filedialog.askopenfilename())
-        uri = pathlib.Path(view_file).as_uri()
-        path,name = os.path.split(view_file)
+        #view_file = os.path.realpath(tk.filedialog.askopenfilename())
+        #uri = pathlib.Path(view_file).as_uri()
+        #path,name = os.path.split(view_file)
         url = "https://kitware.github.io/paraview-glance/app/"
-        url += "?name=" + name
-        url += "&url=" + uri
-        print(url)
+        #url += "?name=" + name
+        #url += "&url=" + uri
+        #print(url)
         webbrowser.open(url)
     
     def hdl_ctp(self):
@@ -355,6 +486,7 @@ class CTP_App(tk.Tk):
         if len(self.ctp_files)>0:
             initialdir = os.path.dirname(self.ctp_files[0])
         self.ctp_files = list(tk.filedialog.askopenfilenames(
+            title='CTP files',
             initialdir=initialdir))
         self.cta_file = ""
 
@@ -364,6 +496,7 @@ class CTP_App(tk.Tk):
         if len(self.cta_file)>0:
             initialdir,initialfile = os.path.split(self.cta_file)
         self.cta_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='CTA file',
             initialdir=initialdir,
             initialfile=initialfile))
         self.ctp_files = []
@@ -374,6 +507,7 @@ class CTP_App(tk.Tk):
         if len(self.dsa_file)>0:
             initialdir,initialfile = os.path.split(self.dsa_file)
         self.dsa_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='DSA file',
             initialdir=initialdir,
             initialfile=initialfile))
 
@@ -383,6 +517,7 @@ class CTP_App(tk.Tk):
         if len(self.cbf_file)>0:
             initialdir,initialfile = os.path.split(self.cbf_file)
         self.cbf_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='CBF file',
             initialdir=initialdir,
             initialfile=initialfile))
 
@@ -392,6 +527,7 @@ class CTP_App(tk.Tk):
         if len(self.cbv_file)>0:
             initialdir,initialfile = os.path.split(self.cbv_file)
         self.cbv_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='CBV file',
             initialdir=initialdir,
             initialfile=initialfile))
 
@@ -401,6 +537,7 @@ class CTP_App(tk.Tk):
         if len(self.tmax_file)>0:
             initialdir,initialfile = os.path.split(self.tmax_file)
         self.tmax_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='TMax file',
             initialdir=initialdir,
             initialfile=initialfile))
 
@@ -410,6 +547,7 @@ class CTP_App(tk.Tk):
         if len(self.ttp_file)>0:
             initialdir,initialfile = os.path.split(self.ttp_file)
         self.ttp_file = os.path.realpath(tk.filedialog.askopenfilename(
+            title='TTP file',
             initialdir=initialdir,
             initialfile=initialfile))
 
@@ -418,6 +556,7 @@ class CTP_App(tk.Tk):
         if len(self.process_out_dir)>0:
             initialdir = self.process_out_dir
         self.process_out_dir = os.path.realpath(tk.filedialog.askdirectory(
+            title='Output directory',
             initialdir=initialdir))
 
     def report_progress(self, label, percentage):
@@ -484,7 +623,7 @@ class CTP_App(tk.Tk):
         if self.skip_brain_segmentation.get() == 0:
             self.report_progress("Segmenting Brain",20)
             if cta_im != None:
-                cta_brain_im = scv_segment_brain_from_cta(cta_im,
+                cta_brain_im = scv_segment_brain_from_ct(cta_im,
                     report_progress = self.report_subprogress,
                     debug=debug)
                 itk.imwrite(cta_brain_im,
