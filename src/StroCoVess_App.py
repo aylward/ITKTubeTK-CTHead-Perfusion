@@ -4,6 +4,7 @@ import subprocess
 import pathlib
 from pathlib import Path
 import csv
+import numpy as np
 
 import tkinter as tk
 import tkinter.filedialog
@@ -66,7 +67,7 @@ class CTP_App(tk.Tk):
         self.reg_fixed_image = self.ctp_files[3]
         self.reg_out_dir = "./"
 
-        self.prep_ctp_4d_in_file = "./results/CTP.dcm"
+        self.prep_ctp_4d_in_file = ".../ITKTubeTK-StrokeCollateralVessels/CTP_4D_Small.mha"
         self.prep_ctp_4d_out_dir = "./results"
 
         self.process_out_dir = "./results"
@@ -393,6 +394,9 @@ class CTP_App(tk.Tk):
             title='Output directory',
             initialdir=self.prep_ctp_4d_out_dir))
 
+#############################################################################################
+#############################################################################################
+#############################################################################################
     def hdl_prep_ctp_4d_process(self):
         self.report_progress("Preparing 4D CTP image",5)
         debug = False
@@ -403,45 +407,64 @@ class CTP_App(tk.Tk):
         self.prep_ctp_4d_out_dir 
         ctp_dir,ctp_filename = os.path.split(
             self.prep_ctp_4d_in_file)
+
+        rename_file_ctp = str(ctp_filename)
+        rename_file_ctp = rename_file_ctp.split(".")
+
         new_filename_base = Path(os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, ctp_filename)))
+            self.prep_ctp_4d_out_dir))) # ctp_filename
         img4d_im = itk.imread(self.prep_ctp_4d_in_file, itk.F)
         img4d_array = itk.GetArrayFromImage(img4d_im)
         img4d_shape = img4d_array.shape
+        img4d_spacing = np.array(img4d_im.GetSpacing())
+        img4d_direction = np.array(img4d_im.GetDirection())
+        img4d_origin = np.array(img4d_im.GetOrigin())
+        img3d_spacing = img4d_spacing[0:3]
+        img3d_origin = img4d_origin[0:3]
+        img3d_direction = img4d_direction[0:3, 0:3]
         num_3d_files = img4d_shape[0]
-        new_filenames = np.empty([num_3d_files])
+        new_filenames = [] 
         for i in range(num_3d_files):
-            new_suffix = f'{i:03}.mha'
-            new_filenames[i] = new_filename_base.with_suffix(new_suffix)
-            img3d_array = img4d[i,:,:,:]
+            new_file = f'CTP_{i:03}.mha'
+            new_filename = str(new_filename_base.joinpath(new_file))
+            img3d_array = img4d_im[i,:,:,:]
             img3d_im = itk.GetImageFromArray(img3d_array)
-            itk.imwrite(img3d_im, new_filenames[i])
-        self.reg_fixed_image = new_filesnames[num_3d_files//2]
+            img3d_im.SetSpacing(img3d_spacing)
+            img3d_im.SetOrigin(img3d_origin)
+            img3d_im.SetDirection(abs(img3d_direction))
+            itk.imwrite(img3d_im, new_filename)
+            new_filenames.append(new_filename)
+        self.reg_fixed_image = new_filenames[num_3d_files//2]
         self.reg_in_files = new_filenames
         scv_register_ctp_images(self.reg_fixed_image,
             self.reg_in_files,
-            output_dir=self.pre_ctp_4d_out_dir,
+            output_dir=self.prep_ctp_4d_out_dir,
             report_progress=self.report_subprogress,
             debug=debug)
 
         # update filenames to registered ctp
         for i in range(num_3d_files):
-            suffix = Path(new_filenames[i]).suffix
-            new_suffix = "_reg"+suffix
-            new_filenames[i] = Path(new_filenames[i]).with_suffix(new_suffix)
+            new_suffix = Path(new_filenames[i]).suffix
+            rename_file_name = str(new_filenames[i])
+            rename_file_name = rename_file_name.split(".")
+            new_filenames[i] = str(rename_file_name[0]) + "_reg"
+            new_filenames[i] = Path(new_filename).joinpath(new_filenames[i]).with_suffix(new_suffix)
         # Write 4D ctp registered
         img3d_im = itk.imread(new_filenames[0],itk.F)
         img3d_array = itk.GetArrayFromImage(img3d_im)
-        img4d_shape[1:3] = img3d_array.shape
+        img4d_shape = list(img4d_shape)
+        img4d_shape[1:4] = img3d_array.shape
+        img4d_shape = tuple(img4d_shape)
         img4d_array = np.empty(img4d_shape)
         for i,new_file in enumerate(new_filenames):
             img3d_im = itk.imread(new_file)
-            img3d_array = itk.GetArrayFromImage(igm3d_im)
+            img3d_array = itk.GetArrayFromImage(img3d_im)
             img4d_array[i,:,:,:] = img3d_array
         img4d_im = itk.GetImageFromArray(img4d_array)
-        suffix = Path(ctp_filename).suffix
-        new_suffix = "_reg"+suffix
-        new_ctp_filename = Path(ctp_filename).with_suffix(new_suffix)
+        new_suffix = Path(ctp_filename).suffix
+        ## new_suffix = "_reg"+suffix
+        name_file = rename_file_ctp[0] + "_reg"
+        new_ctp_filename = Path(name_file).with_suffix(new_suffix)
         new_ctp_4d_out_filename = os.path.realpath(os.path.join(
             self.prep_ctp_4d_out_dir, new_ctp_filename))
         itk.imwrite(img4d_im, new_ctp_4d_out_filename)
@@ -450,26 +473,42 @@ class CTP_App(tk.Tk):
         ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(new_filenames,
             report_progress = self.report_subprogress,
             debug=debug,
-            output_dir=self.pre_ctp_4d_out_dir)
-        suffix = Path(ctp_filename).suffix
-        new_suffix = "_ct"+suffix
-        ct_filename = Path(ctp_filename).with_suffix(new_suffix)
-        itk.imwrite(ct_im, ct_filename)
-        new_suffix = "_cta"+suffix
-        cta_filename = Path(ctp_filename).with_suffix(new_suffix)
-        itk.imwrite(cta_im, cta_filename)
-        new_suffix = "_dsa"+suffix
-        dsa_filename = Path(ctp_filename).with_suffix(new_suffix)
-        itk.imwrite(dsa_im, dsa_filename)
+            output_dir=self.prep_ctp_4d_out_dir)
+        new_suffix = Path(ctp_filename).suffix
+        ## new_suffix = "_ct"+suffix
+        new_file_ct = rename_file_ctp[0] + "_ct"
+        ct_filename = Path(new_file_ct).with_suffix(new_suffix)
+        new_ct_out_filename = os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, ct_filename))
+        itk.imwrite(ct_im, new_ct_out_filename)
+        ## new_suffix = "_cta"+suffix
+        new_file_cta = rename_file_ctp[0] + "_cta"
+        cta_filename = Path(new_file_cta).with_suffix(new_suffix)
+        new_cta_out_filename = os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, cta_filename))
+        itk.imwrite(cta_im, new_cta_out_filename)
+        ## new_suffix = "_dsa"+suffix
+        new_file_dsa = rename_file_ctp[0] + "_dsa"
+        dsa_filename = Path(new_file_dsa).with_suffix(new_suffix)
+        new_dsa_out_filename = os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, dsa_filename))
+        itk.imwrite(dsa_im, new_dsa_out_filename)
 
         # Segment brain from CT
         ct_brain = scv_segment_brain_from_ct(ct_im,
             report_progress = self.report_subprogress,
             debug=debug)
-        suffix = Path(ct_filename).suffix
-        new_suffix = "_brain"+suffix
-        ct_brain_filename = Path(ct_filename).with_suffix(new_suffix)
-        itk.imwrite(ct_brain, ct_brain_filename)
+        rename_file_ct = str(ct_filename)
+        rename_file_ct = rename_file_ct.split(".")
+        new_suffix = Path(ct_filename).suffix
+        name_file = rename_file_ct[0] + "_brain"
+        ct_brain_filename = Path(name_file).with_suffix(new_suffix)
+        ct_brain_out_filename = os.path.realpath(os.path.join(
+            self.prep_ctp_4d_out_dir, ct_brain_filename))
+        itk.imwrite(ct_brain, ct_brain_out_filename)
+#############################################################################################
+#############################################################################################
+#############################################################################################
 
     def hdl_view(self):
         #view_file = os.path.realpath(tk.filedialog.askopenfilename())
