@@ -9,7 +9,6 @@ import numpy as np
 import itk
 from itk import TubeTK as ttk
 
-import numpy as np
 
 #################
 #################
@@ -96,34 +95,26 @@ def scv_segment_brain_from_ct(ct_image,
     LabelMapType = itk.Image[itk.UC,3]
 
     report_progress("Threshold",5)
-    thresh = ttk.ImageMath.New(Input=cta_image)
-    thresh.ReplaceValuesOutsideMaskRange(cta_image,1,6000,0)
-    thresh.ReplaceValuesOutsideMaskRange(cta_image,0,600,1)
-    cta_tmp = thresh.GetOutput()
-    thresh.ReplaceValuesOutsideMaskRange(cta_tmp,0,1,2)
-    cta_mask = thresh.GetOutputUChar()
+    thresh = ttk.ImageMath.New(Input=ct_image)
+    thresh.IntensityWindow(-50,6000,0,6000)
+    imgt = thresh.GetOutput()
+    thresh.ReplaceValuesOutsideMaskRange(imgt,1,6000,0)
+    thresh.ReplaceValuesOutsideMaskRange(imgt,0,600,1)
+    tmpimg = thresh.GetOutput()
+    thresh.ReplaceValuesOutsideMaskRange(tmpimg,0,1,2)
+    ct_tmp = thresh.GetOutput()
 
     report_progress("Initial Mask",10)
-    maskMath = ttk.ImageMath.New(Input=cta_mask)
-    maskMath.Threshold(0,1,0,1)
-    maskMath.Erode(15,1,0)
-    maskMath.Dilate(20,1,0)
-    maskMath.Dilate(12,0,1)
-    maskMath.Erode(12,1,0)
-    brainSeed = maskMath.GetOutputUChar()
-    maskMath.SetInput(cta_mask)
-    maskMath.Threshold(2,2,0,1)
-    maskMath.Erode(2,1,0)
-    maskMath.Dilate(10,1,0)
-    maskMath.Erode(7,1,0)
-    skullSeed = maskMath.GetOutputUChar()
-    maskMath.AddImages(brainSeed,1,2)
+    maskMath = ttk.ImageMath.New(Input=ct_tmp)
+    maskMath.Dilate(15,1,0)
+    maskMath.Dilate(15,0,1)
+    maskMath.Erode(6,1,0)
     comboSeed = maskMath.GetOutputUChar()
-
+    
     report_progress("Connected Component",20)
     segmenter = ttk.SegmentConnectedComponentsUsingParzenPDFs[ImageType,
                     LabelMapType].New()
-    segmenter.SetFeatureImage( cta_image )
+    segmenter.SetFeatureImage( ct_image )
     segmenter.SetInputLabelMap( comboSeed )
     segmenter.SetObjectId( 2 )
     segmenter.AddObjectId( 1 )
@@ -135,7 +126,12 @@ def scv_segment_brain_from_ct(ct_image,
     brainMaskRaw = segmenter.GetOutputLabelMap()
 
     report_progress("Masking",60)
+
+    maskMath = itk.CastImageFilter[LabelMapType, ImageType].New()
     maskMath.SetInput(brainMaskRaw)
+    maskMath.Update()
+    brainMaskF = maskMath.GetOutput()
+    maskMath = ttk.ImageMath.New(Input = brainMaskF)
     maskMath.Threshold(2,2,1,0)
     maskMath.Erode(1,1,0)
     brainMaskRaw2 = maskMath.GetOutputUChar()
@@ -151,12 +147,12 @@ def scv_segment_brain_from_ct(ct_image,
     cast.Update()
     brainMaskF = cast.GetOutput()
 
-    brainMath = ttk.ImageMath[ImageType].New(Input=cta_image)
+    brainMath = ttk.ImageMath[ImageType].New(Input=ct_image)
     brainMath.ReplaceValuesOutsideMaskRange( brainMaskF,1,1,0)
-    cta_brain_image = brainMath.GetOutput()
+    ct_brain_image = brainMath.GetOutput()
 
     report_progress("Done",100)
-    return cta_brain_image
+    return ct_brain_image
 
 
 #################
@@ -374,7 +370,11 @@ def scv_extract_vessels_from_cta(cta_image,
     report_progress("Done",100)
     return tubeMaskImage,vSeg.GetTubeGroup()
 
-
+#################
+#################
+#################
+#################
+#################
 def scv_register_ctp_images(fixed_image_file,
                         moving_image_files,
                         output_dir,
@@ -437,16 +437,22 @@ def scv_register_ctp_images(fixed_image_file,
                                                 moving_im,tfm,-1024)
             if output_dir!=None:
                 pname,fname = os.path.split(moving_image_files[imNum])
-                suffix = Path(fname).suffixA
-                new_suffix = "_reg"+suffix
-                new_fname = Path(fname).with_suffix(new_suffix)
+                new_suffix = Path(fname).suffix
+                rename_file_fname = str(fname)
+                rename_file_fname = rename_file_fname.split(".")
+                new_fname = rename_file_fname[0]+"_reg"
+                new_filename = str(Path(output_dir).joinpath(new_fname).with_suffix(new_suffix))
                 itk.imwrite(moving_reg_im,
-                    output_dir+"/"+new_fname,
+                    new_filename,
                     compression=True)
         elif output_dir!=None:
             pname,fname = os.path.split(moving_image_files[imNum])
-            itk.imwrite(fixed_im,
-                output_dir+"/"+fname,
+            rename_file_fname = str(fname)
+            rename_file_fname = rename_file_fname.split(".")
+            new_fname = rename_file_fname[0]+"_reg"
+            new_filename = str(Path(output_dir).joinpath(new_fname).with_suffix(new_suffix))
+            itk.imwrite(moving_reg_im,
+                new_filename,
                 compression=True)
 
 def scv_register_atlas_to_image(atlas_im, atlas_mask_im, in_im):
