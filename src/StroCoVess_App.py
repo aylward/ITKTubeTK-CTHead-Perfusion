@@ -34,22 +34,31 @@ def get_atlas_path():
         return os.path.join(sys._MEIPASS, 'StroCoVess', 'atlas')
     return os.path.dirname(os.path.realpath(__file__))+'/atlas'
 
+
 sys.path.append(get_lib_path())
-from StrokeCollateralVessels_Lib import *
+from StroCoVess_Lib import *
+from ToggleFrame import *
 
 class CTP_App(tk.Tk):
 
     def __init__(self):
         super().__init__()
 
-        self.ctp_files = ["../data/CTP/CTP06.mha",
-                          "../data/CTP/CTP09.mha",
+        self.ctp_files = ["../data/CTP/CTP04.mha",
+                          "../data/CTP/CTP06.mha",
+                          "../data/CTP/CTP08.mha",
+                          "../data/CTP/CTP10.mha",
                           "../data/CTP/CTP12.mha",
-                          "../data/CTP/CTP15.mha",
+                          "../data/CTP/CTP14.mha",
+                          "../data/CTP/CTP16.mha",
                           "../data/CTP/CTP18.mha",
-                          "../data/CTP/CTP21.mha",
+                          "../data/CTP/CTP20.mha",
+                          "../data/CTP/CTP22.mha",
                           "../data/CTP/CTP24.mha",
-                          "../data/CTP/CTP27.mha"]
+                          "../data/CTP/CTP26.mha",
+                          "../data/CTP/CTP28.mha",
+                          "../data/CTP/CTP30.mha",
+                          "../data/CTP/CTP32.mha"]
 
         self.ct_file = ""
         self.cta_file = ""
@@ -63,14 +72,19 @@ class CTP_App(tk.Tk):
         self.dcm_in_dir = "./"
         self.dcm_out_dir = "./"
 
-        self.reg_in_files = self.ctp_files
-        self.reg_fixed_image = self.ctp_files[3]
-        self.reg_out_dir = "./"
+        self.prep_3d_in_files = self.ctp_files
+        self.prep_3d_out_dir = "./"
 
-        self.prep_ctp_4d_in_file = ".../ITKTubeTK-StrokeCollateralVessels/CTP_4D_Small.mha"
-        self.prep_ctp_4d_out_dir = "./results"
+        self.prep_4d_in_file = "../data/CTP/CTP_4D.mha"
+        self.prep_4d_out_dir = "../data/results"
 
-        self.process_out_dir = "./results"
+        self.workflow_4d_in_file = "../data/CTP/CTP_4D.mha"
+        self.workflow_4d_out_dir = "../data/results"
+
+        self.workflow_3d_in_file = self.ctp_files
+        self.workflow_3d_out_dir = "../data/results"
+
+        self.process_out_dir = "../data/results"
 
         self.progress_status = ""
 
@@ -101,16 +115,6 @@ class CTP_App(tk.Tk):
             command=self.hdl_dcm,
             width=20
             ).pack(pady=5)
-        btn_prep_ctp_4d = tk.Button(master=frm_utility,
-            text="Prep for PerfusionToolbox",
-            command=self.hdl_prep_ctp_4d,
-            width=20
-            ).pack(pady=5)
-        btn_register = tk.Button(master=frm_utility,
-            text="Register CTP images",
-            command=self.hdl_reg,
-            width=20
-            ).pack(pady=5)
         btn_view = tk.Button(master=frm_utility,
             text="View a file",
             command=self.hdl_view,
@@ -123,16 +127,61 @@ class CTP_App(tk.Tk):
             ).pack(pady=5)
         frm_utility.pack(fill=tk.X)
     
-        frm_scv = tk.Frame(master=self,
+        frm_workflows = tk.Frame(master=self,
             relief=tk.RIDGE,
+            borderwidth=5,
+            bg="light green",
+            pady=5)
+        lbl_workflows = tk.Label(master=frm_workflows,
+            text="Process Perfusion files",
+            bg="light green").pack()
+
+        btn_workflow_4d = tk.Button(master=frm_workflows,
+            text="Process 4D perfusion file",
+            command=self.hdl_workflow_4d,
+            width=20
+            ).pack(pady=5)
+        btn_workflow_3d = tk.Button(master=frm_workflows,
+            text="Process 3D perfusion file",
+            command=self.hdl_workflow_3d,
+            width=20
+            ).pack(pady=5)
+        frm_workflows.pack(fill=tk.X)
+
+        frm_steps = ToggledFrame(master=self,
+            relief=tk.RIDGE,
+            text="Advanced Options",
             borderwidth=5,
             bg="light sky blue",
             pady=5)
-        lbl_scv = tk.Label(master=frm_scv,
-            text="Process Perfusion files",
+        frm_steps.pack(fill=tk.X) 
+        lbl_steps = tk.Label(master=frm_steps.sub_frame,
+            text="Workflow methods",
             bg="light sky blue").pack()
 
-        frm_ctp = tk.Frame(master=frm_scv,
+        frm_prep = tk.Frame(master=frm_steps.sub_frame,
+            relief=tk.GROOVE,
+            borderwidth=5,
+            bg="light sky blue",
+            padx=5,
+            pady=5)
+        lbl_prep= tk.Label(master=frm_prep,
+            text="Step 0: Preprocess:",
+            bg="light sky blue"
+            ).pack(side=tk.LEFT)
+        btn_prep_4d = tk.Button(master=frm_prep,
+            text="Prepare 4D CTP file",
+            command=self.hdl_prep_4d,
+            width=20
+            ).pack(pady=5)
+        btn_prep_3d= tk.Button(master=frm_prep,
+            text="Prepare 3D CTP files",
+            command=self.hdl_prep_3d,
+            width=20
+            ).pack(pady=5)
+        frm_prep.pack(padx=5,fill=tk.X)
+
+        frm_ctp = tk.Frame(master=frm_steps.sub_frame,
             relief=tk.GROOVE,
             borderwidth=5,
             bg="light sky blue",
@@ -150,23 +199,9 @@ class CTP_App(tk.Tk):
             text="Set CTA file",
             command=self.hdl_cta,
             width=20).pack()
-        btn_dsa= tk.Button(master=frm_ctp,
-            text="Set 3D DSA file",
-            command=self.hdl_dsa,
-            width=20).pack()
-        self.skip_brain_segmentation = tk.IntVar()
-        ckb_skip_brain_segmentation = tk.Checkbutton(master=frm_ctp,
-            text="Skip brain segmentation",
-            variable=self.skip_brain_segmentation,
-            bg="light sky blue").pack()
-        self.skip_vessel_enhancement = tk.IntVar()
-        ckb_skip_vessel_enhancement = tk.Checkbutton(master=frm_ctp,
-            text="Skip vessel enhancement",
-            variable=self.skip_vessel_enhancement,
-            bg="light sky blue").pack()
         frm_ctp.pack(padx=5,fill=tk.X)
     
-        frm_perf = tk.Frame(master=frm_scv,
+        frm_perf = tk.Frame(master=frm_steps.sub_frame,
             relief=tk.GROOVE,
             borderwidth=5,
             bg="light sky blue",
@@ -194,7 +229,7 @@ class CTP_App(tk.Tk):
             width=20).pack()
         frm_perf.pack(padx=5,fill=tk.X)
     
-        frm_process = tk.Frame(master=frm_scv,
+        frm_process = tk.Frame(master=frm_steps.sub_frame,
             relief=tk.GROOVE,
             borderwidth=5,
             bg="light sky blue",
@@ -215,25 +250,41 @@ class CTP_App(tk.Tk):
             bg="pale green",
             width=20
             ).pack(pady=5)
-        self.lbl_progress = tk.Label(frm_process,
+        frm_process.pack(padx=5,fill=tk.BOTH)
+
+        #frm_steps.pack(fill=tk.BOTH)
+
+        frm_progress = tk.Frame(master=self,
+            relief=tk.RIDGE,
+            borderwidth=5,
+            bg="light blue",
+            pady=5)
+        lbl_progress = tk.Label(master=frm_progress,
+            text="Progress",
+            bg="light blue").pack()
+
+        self.lbl_progress = tk.Label(frm_progress,
             text="Status: Idle",
-            bg="light sky blue",
+            bg="light blue",
             width=40)
         self.lbl_progress.pack()
-        self.pgb_progress = Progressbar(frm_process,
+
+        self.pgb_progress = Progressbar(frm_progress,
             orient=tk.HORIZONTAL,
             length=150,
             mode='determinate')
         self.pgb_progress.pack()
-        self.pgb_subprogress = Progressbar(frm_process,
+        self.pgb_subprogress = Progressbar(frm_progress,
             orient=tk.HORIZONTAL,
             length=150,
             mode='determinate')
         self.pgb_subprogress.pack()
-        frm_process.pack(padx=5,fill=tk.BOTH)
+        frm_progress.pack(fill=tk.BOTH)
     
-        frm_scv.pack(fill=tk.BOTH)
 
+#################################
+#################################
+#################################
     def hdl_help(self):
         box_help = tk.messagebox.showinfo(title="Help",
             message = "      Stoke Collateral Vessels \n" +
@@ -254,6 +305,9 @@ class CTP_App(tk.Tk):
             "      ITKTubeTK-StrokeCollateralVessels"
             )
 
+#################################
+#################################
+#################################
     def hdl_dcm(self):
         win_dcm = tk.Tk()
 
@@ -290,226 +344,223 @@ class CTP_App(tk.Tk):
             initialdir=self.dcm_out_dir))
 
     def hdl_dcm_process(self):
-        dcm2niix = os.path.realpath( os.path.join(get_bin_path(), 'dcm2niix.exe') )
+        dcm2niix = os.path.realpath( os.path.join(get_bin_path(),
+            'dcm2niix.exe') )
         subprocess.call([dcm2niix, "-o", self.dcm_out_dir, self.dcm_in_dir])
 
-    def hdl_reg(self):
-        win_reg = tk.Tk()
 
-        frm_title = tk.Frame(master=win_reg)
-        lbl_title = tk.Label(master=frm_title,
-            text="Image Registration",
-            pady=5).pack(padx=5,pady=5)
-        frm_title.pack(fill=tk.BOTH)
+#################################
+#################################
+#################################
+    def hdl_workflow_4d(self):
+        win_workflow_4d = tk.Tk()
 
-        btn_reg_in_files = tk.Button(master=win_reg,
-            text="1) Set input files",
-            command=self.hdl_reg_in_files,
-            width=20).pack(padx=5,pady=5)
-        btn_reg_fixed_image = tk.Button(master=win_reg,
-            text="2) Set fixed image",
-            command=self.hdl_reg_fixed_image,
-            width=20).pack(padx=5,pady=5)
-        btn_reg_out_dir = tk.Button(master=win_reg,
-            text="3) Set output directory",
-            command=self.hdl_reg_out_dir,
-            width=20).pack(padx=5,pady=5)
-        btn_reg_process = tk.Button(master=win_reg,
-            text="4) Process",
-            command=self.hdl_reg_process,
-            bg="pale green",
-            width=20).pack(padx=5,pady=5)
-
-        win_reg.mainloop()
-
-    def hdl_reg_in_files(self):
-        filepath,filename = os.path.split(self.reg_in_files[0])
-        self.reg_in_files = tk.filedialog.askopenfilenames(
-            title='Input (moving) image files to be registered',
-            initialdir=filepath)
-        if len(self.reg_in_files)>0:
-            mid_file = len(self.reg_in_files)//2
-            self.reg_fixed_image = self.reg_in_files[mid_file]
-
-    def hdl_reg_fixed_image(self):
-        filepath,filename = os.path.split(self.reg_fixed_image)
-        self.reg_fixed_image = os.path.realpath(
-            tk.filedialog.askopenfilename(
-                title='Baseline (fixed) image file',
-                initialdir=filepath,
-                initialfile=filename))
-
-    def hdl_reg_out_dir(self):
-        self.reg_out_dir = os.path.realpath(tk.filedialog.askdirectory(
-            title='Output directory',
-            initialdir=self.reg_out_dir))
-
-    def hdl_reg_process(self):
-        self.report_progress("Registering images",5)
-        debug = False
-        if self.debug.get() == 1:
-            debug = True
-        scv_register_ctp_images(self.reg_fixed_image,
-            self.reg_in_files,
-            output_dir=self.reg_out_dir,
-            report_progress=self.report_subprogress,
-            debug=debug)
-        self.report_progress("Done!",100)
-
-    def hdl_prep_ctp_4d(self):
-        win_prep_ctp_4d = tk.Tk()
-
-        frm_title = tk.Frame(master=win_prep_ctp_4d)
+        frm_title = tk.Frame(master=win_workflow_4d)
         lbl_title = tk.Label(master=frm_title,
             text="Prepare 4D CTP for perfusion toolbox",
             pady=5).pack(padx=5,pady=5)
         frm_title.pack(fill=tk.BOTH)
 
-        btn_prep_ctp_4d_in_file = tk.Button(master=win_prep_ctp_4d,
-            text="1) Set input file",
-            command=self.hdl_prep_ctp_4d_in_file,
+        btn_workflow_4d_in_file = tk.Button(master=win_workflow_4d,
+            text="1) Set input CTP file",
+            command=self.hdl_workflow_4d_in_file,
             width=20).pack(padx=5,pady=5)
-        btn_prep_ctp_4d_out_dir = tk.Button(master=win_prep_ctp_4d,
+        btn_workflow_4d_out_dir = tk.Button(master=win_workflow_4d,
             text="2) Set output directory",
-            command=self.hdl_prep_ctp_4d_out_dir,
+            command=self.hdl_workflow_4d_out_dir,
             width=20).pack(padx=5,pady=5)
-        btn_prep_ctp_4d_process = tk.Button(master=win_prep_ctp_4d,
+        btn_workflow_4d_process = tk.Button(master=win_workflow_4d,
             text="3) Process",
-            command=self.hdl_prep_ctp_4d_process,
+            command=self.hdl_workflow_4d_process,
             bg="pale green",
             width=20).pack(padx=5,pady=5)
 
-        win_prep_ctp_4d.mainloop()
+        win_workflow_4d.mainloop()
 
-    def hdl_prep_ctp_4d_in_file(self):
-        filepath,filename = os.path.split(self.prep_ctp_4d_in_file)
-        self.prep_ctp_4d_in_file = tk.filedialog.askopenfilename(
+    def hdl_workflow_4d_in_file(self):
+        filepath,filename = os.path.split(self.workflow_4d_in_file)
+        self.workflow_4d_in_file = tk.filedialog.askopenfilename(
             title='4D CTP file to be prepared',
             initialdir=filepath,
             initialfile=filename)
 
-    def hdl_prep_ctp_4d_out_dir(self):
-        self.prep_ctp_4d_out_dir = os.path.realpath(
+    def hdl_workflow_4d_out_dir(self):
+        self.workflow_4d_out_dir = os.path.realpath(
             tk.filedialog.askdirectory(
             title='Output directory',
-            initialdir=self.prep_ctp_4d_out_dir))
+            initialdir=self.workflow_4d_out_dir))
 
-#############################################################################################
-#############################################################################################
-#############################################################################################
-    def hdl_prep_ctp_4d_process(self):
+    def hdl_workflow_4d_process(self):
+        self.report_progress("Generating 4D CTP report",5)
+        debug = False
+        if self.debug.get() == 1:
+            debug = True
+
+        self.atlas_path = get_atlas_path()
+        scv_generate_4d_ctp_vessel_report( self.workflow_4d_in_file,
+            self.atlas_path,self.workflow_4d_out_dir,self.report_progress,
+            self.report_subprogress,debug)
+
+#################################
+#################################
+#################################
+    def hdl_workflow_3d(self):
+        win_workflow_3d = tk.Tk()
+
+        frm_title = tk.Frame(master=win_workflow_3d)
+        lbl_title = tk.Label(master=frm_title,
+            text="Prepare 4D CTP for perfusion toolbox",
+            pady=5).pack(padx=5,pady=5)
+        frm_title.pack(fill=tk.BOTH)
+
+        btn_workflow_3d_in_files = tk.Button(master=win_workflow_3d,
+            text="1) Set input CTP files",
+            command=self.hdl_workflow_3d_in_files,
+            width=20).pack(padx=5,pady=5)
+        btn_workflow_3d_out_dir = tk.Button(master=win_workflow_3d,
+            text="2) Set output directory",
+            command=self.hdl_workflow_3d_out_dir,
+            width=20).pack(padx=5,pady=5)
+        btn_workflow_3d_process = tk.Button(master=win_workflow_3d,
+            text="3) Process",
+            command=self.hdl_workflow_3d_process,
+            bg="pale green",
+            width=20).pack(padx=5,pady=5)
+
+        win_workflow_3d.mainloop()
+
+    def hdl_workflow_3d_in_files(self):
+        if len(self.workflow_3d_in_files) > 0:
+            filepath,filename = os.path.split(self.workflow_3d_in_files[0])
+            self.workflow_3d_in_files = tk.filedialog.askopenfilename(
+                title='3D CTP files to be prepared',
+                initialdir=filepath,
+                initialfile=filename)
+        else:
+            self.workflow_3d_in_files = tk.filedialog.askopenfilename(
+                title='3D CTP files to be prepared')
+
+    def hdl_workflow_3d_out_dir(self):
+        self.workflow_3d_out_dir = os.path.realpath(
+            tk.filedialog.askdirectory(
+            title='Output directory',
+            initialdir=self.workflow_3d_out_dir))
+
+    def hdl_workflow_3d_process(self):
+        self.report_progress("Generating 3D CTP report",5)
+        debug = False
+        if self.debug.get() == 1:
+            debug = True
+
+        self.atlas_path = get_atlas_path()
+        scv_generate_3d_ctp_vessel_report( self.workflow_3d_in_files,
+            self.atlas_path,self.workflow_3d_out_dir, report_progress,
+            report_subprogress, debug)
+
+
+#################################
+#################################
+#################################
+    def hdl_prep_3d(self):
+        win_prep_3d = tk.Tk()
+
+        frm_title = tk.Frame(master=win_prep_3d)
+        lbl_title = tk.Label(master=frm_title,
+            text="Image Registration",
+            pady=5).pack(padx=5,pady=5)
+        frm_title.pack(fill=tk.BOTH)
+
+        btn_prep_3d_in_files = tk.Button(master=win_prep_3d,
+            text="1) Set input files",
+            command=self.hdl_prep_3d_in_files,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_3d_out_dir = tk.Button(master=win_prep_3d,
+            text="2) Set output directory",
+            command=self.hdl_prep_3d_out_dir,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_3d_process = tk.Button(master=win_prep_3d,
+            text="3) Process",
+            command=self.hdl_prep_3d_process,
+            bg="pale green",
+            width=20).pack(padx=5,pady=5)
+
+        win_prep_3d.mainloop()
+
+    def hdl_prep_3d_in_files(self):
+        filepath,filename = os.path.split(self.prep_3d_in_files[0])
+        self.prep_3d_in_files = tk.filedialog.askopenfilenames(
+            title='Input (moving) image files to be registered',
+            initialdir=filepath)
+
+    def hdl_prep_3d_out_dir(self):
+        self.prep_3d_out_dir = os.path.realpath(tk.filedialog.askdirectory(
+            title='Output directory',
+            initialdir=self.prep_3d_out_dir))
+
+    def hdl_prep_3d_process(self):
+        self.report_progress("Registering images",5)
+        debug = False
+        if self.debug.get() == 1:
+            debug = True
+
+        scv_prepare_3d_for_perfusion_toolbox(self.prep_3d_in_files,
+            self.prep_3d_out_dir, self.report_progress,
+            self.report_subprogress, debug)
+
+#################################
+#################################
+#################################
+    def hdl_prep_4d(self):
+        win_prep_4d = tk.Tk()
+
+        frm_title = tk.Frame(master=win_prep_4d)
+        lbl_title = tk.Label(master=frm_title,
+            text="Prepare 4D CTP for perfusion toolbox",
+            pady=5).pack(padx=5,pady=5)
+        frm_title.pack(fill=tk.BOTH)
+
+        btn_prep_4d_in_file = tk.Button(master=win_prep_4d,
+            text="1) Set input file",
+            command=self.hdl_prep_4d_in_file,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_4d_out_dir = tk.Button(master=win_prep_4d,
+            text="2) Set output directory",
+            command=self.hdl_prep_4d_out_dir,
+            width=20).pack(padx=5,pady=5)
+        btn_prep_4d_process = tk.Button(master=win_prep_4d,
+            text="3) Process",
+            command=self.hdl_prep_4d_process,
+            bg="pale green",
+            width=20).pack(padx=5,pady=5)
+
+        win_prep_4d.mainloop()
+
+    def hdl_prep_4d_in_file(self):
+        filepath,filename = os.path.split(self.prep_4d_in_file)
+        self.prep_4d_in_file = tk.filedialog.askopenfilename(
+            title='4D CTP file to be prepared',
+            initialdir=filepath,
+            initialfile=filename)
+
+    def hdl_prep_4d_out_dir(self):
+        self.prep_4d_out_dir = os.path.realpath(
+            tk.filedialog.askdirectory(
+            title='Output directory',
+            initialdir=self.prep_4d_out_dir))
+
+    def hdl_prep_4d_process(self):
         self.report_progress("Preparing 4D CTP image",5)
         debug = False
         if self.debug.get() == 1:
             debug = True
 
-        # convert 4D ctp to 3D images
-        self.prep_ctp_4d_out_dir 
-        ctp_dir,ctp_filename = os.path.split(
-            self.prep_ctp_4d_in_file)
+        scv_prepare_4d_for_perfusion_toolbox(self.prep_4d_in_file,
+            self.prep_4d_out_dir, self.report_progress,
+            self.report_subprogress, debug)
 
-        rename_file_ctp = str(ctp_filename)
-        rename_file_ctp = rename_file_ctp.split(".")
-
-        new_filename_base = Path(os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir))) # ctp_filename
-        img4d_im = itk.imread(self.prep_ctp_4d_in_file, itk.F)
-        img4d_array = itk.GetArrayFromImage(img4d_im)
-        img4d_shape = img4d_array.shape
-        img4d_spacing = np.array(img4d_im.GetSpacing())
-        img4d_direction = np.array(img4d_im.GetDirection())
-        img4d_origin = np.array(img4d_im.GetOrigin())
-        img3d_spacing = img4d_spacing[0:3]
-        img3d_origin = img4d_origin[0:3]
-        img3d_direction = img4d_direction[0:3, 0:3]
-        num_3d_files = img4d_shape[0]
-        new_filenames = [] 
-        for i in range(num_3d_files):
-            new_file = f'CTP_{i:03}.mha'
-            new_filename = str(new_filename_base.joinpath(new_file))
-            img3d_array = img4d_im[i,:,:,:]
-            img3d_im = itk.GetImageFromArray(img3d_array)
-            img3d_im.SetSpacing(img3d_spacing)
-            img3d_im.SetOrigin(img3d_origin)
-            img3d_im.SetDirection(abs(img3d_direction))
-            itk.imwrite(img3d_im, new_filename)
-            new_filenames.append(new_filename)
-        self.reg_fixed_image = new_filenames[num_3d_files//2]
-        self.reg_in_files = new_filenames
-        scv_register_ctp_images(self.reg_fixed_image,
-            self.reg_in_files,
-            output_dir=self.prep_ctp_4d_out_dir,
-            report_progress=self.report_subprogress,
-            debug=debug)
-
-        # update filenames to registered ctp
-        for i in range(num_3d_files):
-            new_suffix = Path(new_filenames[i]).suffix
-            rename_file_name = str(new_filenames[i])
-            rename_file_name = rename_file_name.split(".")
-            new_filenames[i] = str(rename_file_name[0]) + "_reg"
-            new_filenames[i] = Path(new_filename).joinpath(new_filenames[i]).with_suffix(new_suffix)
-        # Write 4D ctp registered
-        img3d_im = itk.imread(new_filenames[0],itk.F)
-        img3d_array = itk.GetArrayFromImage(img3d_im)
-        img4d_shape = list(img4d_shape)
-        img4d_shape[1:4] = img3d_array.shape
-        img4d_shape = tuple(img4d_shape)
-        img4d_array = np.empty(img4d_shape)
-        for i,new_file in enumerate(new_filenames):
-            img3d_im = itk.imread(new_file)
-            img3d_array = itk.GetArrayFromImage(img3d_im)
-            img4d_array[i,:,:,:] = img3d_array
-        img4d_im = itk.GetImageFromArray(img4d_array)
-        new_suffix = Path(ctp_filename).suffix
-        ## new_suffix = "_reg"+suffix
-        name_file = rename_file_ctp[0] + "_reg"
-        new_ctp_filename = Path(name_file).with_suffix(new_suffix)
-        new_ctp_4d_out_filename = os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, new_ctp_filename))
-        itk.imwrite(img4d_im, new_ctp_4d_out_filename)
-        
-        # Compute CT, CTA, DSA
-        ct_im,cta_im,dsa_im = scv_convert_ctp_to_cta(new_filenames,
-            report_progress = self.report_subprogress,
-            debug=debug,
-            output_dir=self.prep_ctp_4d_out_dir)
-        new_suffix = Path(ctp_filename).suffix
-        ## new_suffix = "_ct"+suffix
-        new_file_ct = rename_file_ctp[0] + "_ct"
-        ct_filename = Path(new_file_ct).with_suffix(new_suffix)
-        new_ct_out_filename = os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, ct_filename))
-        itk.imwrite(ct_im, new_ct_out_filename)
-        ## new_suffix = "_cta"+suffix
-        new_file_cta = rename_file_ctp[0] + "_cta"
-        cta_filename = Path(new_file_cta).with_suffix(new_suffix)
-        new_cta_out_filename = os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, cta_filename))
-        itk.imwrite(cta_im, new_cta_out_filename)
-        ## new_suffix = "_dsa"+suffix
-        new_file_dsa = rename_file_ctp[0] + "_dsa"
-        dsa_filename = Path(new_file_dsa).with_suffix(new_suffix)
-        new_dsa_out_filename = os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, dsa_filename))
-        itk.imwrite(dsa_im, new_dsa_out_filename)
-
-        # Segment brain from CT
-        ct_brain = scv_segment_brain_from_ct(ct_im,
-            report_progress = self.report_subprogress,
-            debug=debug)
-        rename_file_ct = str(ct_filename)
-        rename_file_ct = rename_file_ct.split(".")
-        new_suffix = Path(ct_filename).suffix
-        name_file = rename_file_ct[0] + "_brain"
-        ct_brain_filename = Path(name_file).with_suffix(new_suffix)
-        ct_brain_out_filename = os.path.realpath(os.path.join(
-            self.prep_ctp_4d_out_dir, ct_brain_filename))
-        itk.imwrite(ct_brain, ct_brain_out_filename)
-#############################################################################################
-#############################################################################################
-#############################################################################################
-
+#################################
+#################################
+#################################
     def hdl_view(self):
         #view_file = os.path.realpath(tk.filedialog.askopenfilename())
         #uri = pathlib.Path(view_file).as_uri()
@@ -520,6 +571,9 @@ class CTP_App(tk.Tk):
         #print(url)
         webbrowser.open(url)
     
+#################################
+#################################
+#################################
     def hdl_ctp(self):
         initialdir = None
         if len(self.ctp_files)>0:
@@ -539,16 +593,6 @@ class CTP_App(tk.Tk):
             initialdir=initialdir,
             initialfile=initialfile))
         self.ctp_files = []
-
-    def hdl_dsa(self):
-        initialdir = None
-        initialfile = None
-        if len(self.dsa_file)>0:
-            initialdir,initialfile = os.path.split(self.dsa_file)
-        self.dsa_file = os.path.realpath(tk.filedialog.askopenfilename(
-            title='DSA file',
-            initialdir=initialdir,
-            initialfile=initialfile))
 
     def hdl_cbf(self):
         initialdir = None
@@ -598,6 +642,9 @@ class CTP_App(tk.Tk):
             title='Output directory',
             initialdir=initialdir))
 
+#################################
+#################################
+#################################
     def report_progress(self, label, percentage):
         self.progress_status = label
         print(label)
@@ -613,6 +660,9 @@ class CTP_App(tk.Tk):
         self.pgb_subprogress['value'] = percentage
         self.update()
 
+#################################
+#################################
+#################################
     def hdl_process(self):
         if not os.path.exists(self.process_out_dir):
             os.mkdir(self.process_out_dir)
@@ -633,11 +683,11 @@ class CTP_App(tk.Tk):
                 debug=debug,
                 output_dir=self.process_out_dir)
             self.report_progress("Converting CTP to CTA",10)
-            itk.imwrite(ct_im,self.process_out_dir+"/ct.mha",
+            itk.imwrite(ct_im,os.path.join(self.process_out_dir,"ct.mha"),
                 compression=True)
-            itk.imwrite(cta_im,self.process_out_dir+"/cta.mha",
+            itk.imwrite(cta_im,os.path.join(self.process_out_dir,"cta.mha"),
                 compression=True)
-            itk.imwrite(dsa_im,self.process_out_dir+"/dsa.mha",
+            itk.imwrite(dsa_im,os.path.join(self.process_out_dir,"dsa.mha"),
                 compression=True)
         elif len(self.cta_file)>0:
             self.report_progress("Reading CTA",5)
@@ -658,36 +708,31 @@ class CTP_App(tk.Tk):
             dsa_im = itk.imread(self.dsa_file,itk.F)
             self.report_progress("Reading DSA",10)
 
-        # Check if brain segmentation is required
-        if self.skip_brain_segmentation.get() == 0:
-            self.report_progress("Segmenting Brain",20)
-            if cta_im != None:
-                cta_brain_im = scv_segment_brain_from_ct(cta_im,
-                    report_progress = self.report_subprogress,
-                    debug=debug)
-                itk.imwrite(cta_brain_im,
-                    self.process_out_dir+"/cta_brain.mha",
+        self.report_progress("Segmenting Brain",20)
+        if cta_im != None:
+            cta_brain_im,mask_brain = scv_segment_brain_from_ct(cta_im,
+                report_progress = self.report_subprogress,
+                debug=debug)
+            itk.imwrite(cta_brain_im,
+                os.path.join(self.process_out_dir,"cta_brain.mha"),
+                compression=True)
+            # Use CTA brain to mask DSA and create DSA_Brain image
+            if dsa_im != None:
+                ImageMath = tube.ImageMath.New(Input=dsa_im)
+                ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
+                    0.000001,9999,0)
+                dsa_brain_im = ImageMath.GetOutput()
+                itk.imwrite(dsa_brain_im,
+                    os.path.join(self.process_out_dir,"dsa_brain.mha"),
                     compression=True)
-                # Use CTA brain to mask DSA and create DSA_Brain image
-                if dsa_im != None:
-                    ImageMath = tube.ImageMath.New(Input=dsa_im)
-                    ImageMath.ReplaceValuesOutsideMaskRange(cta_brain_im,
-                        0.000001,9999,0)
-                    dsa_brain_im = ImageMath.GetOutput()
-                    itk.imwrite(dsa_brain_im,
-                        self.process_out_dir+"/dsa_brain.mha",
-                        compression=True)
-            else:
-                # If it is required and a CTA wasn't provided
-                #   or CTA wasn't generated from CTP, then throw and error
-                self.report_progress("ERROR",100)
-                tk.messagebox.showerror(title="Error",
-                    message="Cannot perform brain segmentation using DSA.\n" +
-                            "Please also include CTP or CTA data.")
-                return
         else:
-            cta_brain_im = cta_im
-            dsa_brain_im = dsa_im
+            # If it is required and a CTA wasn't provided
+            #   or CTA wasn't generated from CTP, then throw and error
+            self.report_progress("ERROR",100)
+            tk.messagebox.showerror(title="Error",
+                message="Cannot perform brain segmentation using DSA.\n" +
+                        "Please also include CTP or CTA data.")
+            return
 
         in_im = cta_im
         in_brain_im = cta_brain_im
@@ -698,27 +743,24 @@ class CTP_App(tk.Tk):
             in_brain_im = dsa_brain_im
             in_name = "dsa"
 
-        if self.skip_vessel_enhancement.get() == 0:
-            self.report_progress("Enhancing vessels",40)
-            # Enhancing vessels creates an image in which intensity is
-            #    related to "vesselness" instead of being related to the
-            #    amount of contrast agent in the vessel.  This simplifies
-            #    subsequent vessel seeding and traversal stopping criteria.
-            in_vess_im,in_brain_vess_im = scv_enhance_vessels_in_cta(
-                in_im,
-                in_brain_im,
-                report_progress=self.report_subprogress,
-                debug=debug)
-            if self.skip_brain_segmentation.get() == 0:
-                itk.imwrite(in_vess_im,
-                    self.process_out_dir+"/"+in_name+"_vessels_enhanced.mha",
-                    compression=True)
-            itk.imwrite(in_brain_vess_im,
-                self.process_out_dir+"/"+in_name+"_brain_vessels_enhanced.mha",
-                compression=True)
-        else:
-            in_vess_im = in_im
-            in_brain_vess_im = in_brain_im
+        self.report_progress("Enhancing vessels",40)
+        # Enhancing vessels creates an image in which intensity is
+        #    related to "vesselness" instead of being related to the
+        #    amount of contrast agent in the vessel.  This simplifies
+        #    subsequent vessel seeding and traversal stopping criteria.
+        in_vess_im,in_brain_vess_im = scv_enhance_vessels_in_cta(
+            in_im,
+            in_brain_im,
+            report_progress=self.report_subprogress,
+            debug=debug)
+        itk.imwrite(in_vess_im,
+            os.path.join(self.process_out_dir,
+                in_name+"_vessels_enhanced.mha"),
+            compression=True)
+        itk.imwrite(in_brain_vess_im,
+            os.path.join(self.process_out_dir,
+                in_name+"_brain_vessels_enhanced.mha"),
+            compression=True)
 
         self.report_progress("Extracting vessels",60)
         vess_mask_im,vess_so = scv_extract_vessels_from_cta(
@@ -728,35 +770,33 @@ class CTP_App(tk.Tk):
             debug=debug,
             output_dir=self.process_out_dir)
 
-        brain_name = ""
-        if self.skip_brain_segmentation.get() == 1:
-            brain_name = "_brain"
-        
         itk.imwrite(in_brain_vess_im,
-            self.process_out_dir+"/"+in_name+brain_name+"_vessels_extracted.mha",
+            os.path.join(self.process_out_dir,
+                in_name+"_vessels_extracted.mha"),
             compression=True)
 
         SOWriter = itk.SpatialObjectWriter[3].New()
         SOWriter.SetInput(vess_so)
         SOWriter.SetBinaryPoints(True)
-        SOWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
-            "_vessels_extracted.tre")
+        SOWriter.SetFileName(os.path.join(self.process_out_dir,
+            in_name+"_vessels_extracted.tre"))
         SOWriter.Update()
 
         VTPWriter = itk.WriteTubesAsPolyData.New()
         VTPWriter.SetInput(vess_so)
-        VTPWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
-            "_vessels_extracted.vtp")
+        VTPWriter.SetFileName(os.path.join(self.process_out_dir,
+            in_name+"_vessels_extracted.vtp"))
         VTPWriter.Update()
         
         self.report_progress("Generating Perfusion Stats",80)
 
         script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.atlas_path = get_atlas_path()
         atlas_im = itk.imread(
-            os.path.join(get_atlas_path(), 'atlas_brainweb.mha'),
+            os.path.join(self.atlas_path,'atlas_brainweb.mha'),
             itk.F)
         atlas_mask_im = itk.imread(
-            os.path.join(get_atlas_path(), 'atlas_brainweb_mask.mha'),
+            os.path.join(self.atlas_path,'atlas_brainweb_mask.mha'),
             itk.F)
         atlas_reg_im,atlas_mask_reg_im = scv_register_atlas_to_image(
             atlas_im,
@@ -769,10 +809,11 @@ class CTP_App(tk.Tk):
             0.000001,9999,0)
         vess_atlas_mask_im = ImageMath.GetOutput()
         itk.imwrite(vess_atlas_mask_im,
-            self.process_out_dir+"/"+in_name+brain_name+"_vess_atlas_mask.mha",
+            os.path.join(self.process_out_dir,
+                in_name+"_vess_atlas_mask.mha"),
             compression=True)
 
-        TubeMath = ttk.TubeMath[3,itk.F].New()
+        TubeMath = tube.TubeMath[3,itk.F].New()
         TubeMath.SetInputTubeGroup(vess_so)
         TubeMath.SetUseAllTubes()
         TubeMath.ComputeTubeRegions(vess_atlas_mask_im)
@@ -783,7 +824,7 @@ class CTP_App(tk.Tk):
         if len(self.ttp_file) > 0:
             self.report_progress("Generating TTP Graphs",92)
             ttp_im = itk.imread(self.ttp_file, itk.F)
-            Resample = ttk.ResampleImage.New(Input=ttp_im)
+            Resample = tube.ResampleImage.New(Input=ttp_im)
             Resample.SetMatchImage(vess_atlas_mask_im)
             Resample.Update()
             ttp_im = Resample.GetOutput()
@@ -814,7 +855,7 @@ class CTP_App(tk.Tk):
         if len(self.cbf_file) > 0:
             self.report_progress("Generating CBF Graphs",94)
             cbf_im = itk.imread(self.cbf_file, itk.F)
-            Resample = ttk.ResampleImage.New(Input=cbf_im)
+            Resample = tube.ResampleImage.New(Input=cbf_im)
             Resample.SetMatchImage(vess_atlas_mask_im)
             Resample.Update()
             cbf_im = Resample.GetOutput()
@@ -839,7 +880,7 @@ class CTP_App(tk.Tk):
         if len(self.cbv_file) > 0:
             self.report_progress("Generating CBV Graphs",96)
             cbv_im = itk.imread(self.cbv_file, itk.F)
-            Resample = ttk.ResampleImage.New(Input=cbv_im)
+            Resample = tube.ResampleImage.New(Input=cbv_im)
             Resample.SetMatchImage(vess_atlas_mask_im)
             Resample.Update()
             cbv_im = Resample.GetOutput()
@@ -863,7 +904,7 @@ class CTP_App(tk.Tk):
         if len(self.tmax_file) > 0:
             self.report_progress("Generating TMax Graphs",98)
             tmax_im = itk.imread(self.tmax_file, itk.F)
-            Resample = ttk.ResampleImage.New(Input=tmax_im)
+            Resample = tube.ResampleImage.New(Input=tmax_im)
             Resample.SetMatchImage(vess_atlas_mask_im)
             Resample.Update()
             tmax_im = Resample.GetOutput()
@@ -889,18 +930,18 @@ class CTP_App(tk.Tk):
         SOWriter = itk.SpatialObjectWriter[3].New()
         SOWriter.SetInput(vess_so)
         SOWriter.SetBinaryPoints(True)
-        SOWriter.SetFileName( self.process_out_dir+"/"+in_name+brain_name+
-            "_vessels_extracted_perf.tre")
+        SOWriter.SetFileName(os.path.join(self.process_out_dir,
+            in_name+"_vessels_extracted_perf.tre"))
         SOWriter.Update()
 
         VTPWriter = itk.WriteTubesAsPolyData.New()
         VTPWriter.SetInput(vess_so)
-        VTPWriter.SetFileName(self.process_out_dir+"/"+in_name+brain_name+
-            "_vessels_extracted_perf.vtp")
+        VTPWriter.SetFileName(os.path.join(self.process_out_dir,
+            in_name+"_vessels_extracted_perf.vtp"))
         VTPWriter.Update()
 
-        csvfilename = self.process_out_dir+"/"+in_name+brain_name
-        csvfilename += "_vessels_extracted_perf.csv"
+        csvfilename = os.path.join(self.process_out_dir,
+            in_name+"_vessels_extracted_perf.csv")
         csvfile = open(csvfilename,'w',newline='')
         csvwriter = csv.writer(csvfile,
             dialect='excel',
@@ -912,6 +953,9 @@ class CTP_App(tk.Tk):
 
         self.report_progress("Done!",100)
     
+#################################
+#################################
+#################################
 if __name__ == '__main__':
     app = CTP_App()
     app.mainloop()
