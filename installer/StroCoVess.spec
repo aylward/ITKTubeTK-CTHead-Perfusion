@@ -23,6 +23,11 @@ binaries += gather_mkl_dlls()
 
 datas = []
 datas += [('../lib/*.py', 'StroCoVess')]
+datas += [('../lib/perfusion_toolbox/*.m', 'StroCoVess/perfusion_toolbox')]
+datas += [('../lib/perfusion_toolbox/utils/*.m', 'StroCoVess/perfusion_toolbox/utils')]
+datas += [('../lib/perfusion_toolbox/utils/*.mat', 'StroCoVess/perfusion_toolbox/utils')]
+datas += [('../lib/perfusion_toolbox/utils/*.asv', 'StroCoVess/perfusion_toolbox/utils')]
+datas += [('../lib/perfusion_toolbox/utils/*.fig', 'StroCoVess/perfusion_toolbox/utils')]
 datas += [('../src/*.py', 'StroCoVess')]
 datas += [('../src/atlas', 'StroCoVess/atlas')]
 datas += [('../src/bin/*.exe', 'StroCoVess/bin')]

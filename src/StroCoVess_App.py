@@ -81,7 +81,7 @@ class CTP_App(tk.Tk):
         self.workflow_4d_in_file = "../data/CTP/CTP_4D.mha"
         self.workflow_4d_out_dir = "../data/results"
 
-        self.workflow_3d_in_file = self.ctp_files
+        self.workflow_3d_in_files = self.ctp_files
         self.workflow_3d_out_dir = "../data/results"
 
         self.process_out_dir = "../data/results"
@@ -432,12 +432,12 @@ class CTP_App(tk.Tk):
     def hdl_workflow_3d_in_files(self):
         if len(self.workflow_3d_in_files) > 0:
             filepath,filename = os.path.split(self.workflow_3d_in_files[0])
-            self.workflow_3d_in_files = tk.filedialog.askopenfilename(
+            self.workflow_3d_in_files = tk.filedialog.askopenfilenames(
                 title='3D CTP files to be prepared',
                 initialdir=filepath,
                 initialfile=filename)
         else:
-            self.workflow_3d_in_files = tk.filedialog.askopenfilename(
+            self.workflow_3d_in_files = tk.filedialog.askopenfilenames(
                 title='3D CTP files to be prepared')
 
     def hdl_workflow_3d_out_dir(self):
@@ -454,8 +454,8 @@ class CTP_App(tk.Tk):
 
         self.atlas_path = get_atlas_path()
         scv_generate_3d_ctp_vessel_report( self.workflow_3d_in_files,
-            self.atlas_path,self.workflow_3d_out_dir, report_progress,
-            report_subprogress, debug)
+            self.atlas_path,self.workflow_3d_out_dir, self.report_progress,
+            self.report_subprogress, debug)
 
 
 #################################

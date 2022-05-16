@@ -366,7 +366,7 @@ def scv_extract_vessels_from_cta(cta_image,
     report_progress("Extracting vessels",40)
     vSeg = tube.SegmentTubes.New(Input=input_im)
     vSeg.SetVerbose(debug)
-    vSeg.SetMinCurvature(0)#.0001)
+    vSeg.SetMinCurvature(0.0001) #0
     vSeg.SetMinRoundness(0.02)
     vSeg.SetMinRidgeness(0.5)
     vSeg.SetMinLevelness(0.0)
@@ -376,8 +376,7 @@ def scv_extract_vessels_from_cta(cta_image,
     #vSeg.SetSeedRadiusMask( initial_radius_im )
     vSeg.SetOptimizeRadius(True)
     vSeg.SetUseSeedMaskAsProbabilities(True)
-    # Performs large-to-small vessel extraction using radius as probability
-    vSeg.SetSeedExtractionMinimumProbability(0.99)
+    vSeg.SetSeedExtractionMinimumProbability(0.95) #0.99
     vSeg.ProcessSeeds()
 
     report_progress("Finalizing",90)
@@ -576,16 +575,17 @@ def scv_prepare_3d_for_perfusion_toolbox(prep_3d_in_filenames,
     report_progress("Saving 4D CTP",60)
     new_ctp_3d_filenames = []
     for i in range(num_3d_files):
-        rename_file_name = str(prep_3d_in_filenames[i])
-        rename_file_name = os.path.splitext(rename_file_name)
+        file_path,file_name = os.path.split(prep_3d_in_filenames[i])
+        rename_file_name = os.path.splitext(str(file_name))
         new_ctp_3d_filenames.append( os.path.realpath(os.path.join(
             prep_3d_out_dirname, str(rename_file_name[0]) + "_reg.nii")))
 
     # Write 4D ctp registered
-    pname,fname = os.path.split(prep_3d_in_filenames[0])
-    ppname,dirname = os.path.split(pname)
-    ctp_base_filename = str(dirname) + "-4D_reg"
-    ctp_filename = ctp_base_filename + ".nii"
+    file_path,file_name = os.path.split(prep_3d_in_filenames[0])
+    rename_file_name = os.path.splitext(str(file_name))
+    ctp_base_filename = str(rename_file_name[0])
+
+    ctp_filename = ctp_base_filename + "-4D_reg.nii"
     ctp_4d_out_filename = os.path.realpath(os.path.join(
         prep_3d_out_dirname, ctp_filename))
     scv_convert_3d_files_to_4d_file(new_ctp_3d_filenames,
@@ -756,13 +756,17 @@ def scv_generate_vessel_report(ctp_3d_filenames,
         Resample.SetInterpolator("Sinc")
         Resample.Update()
         img = Resample.GetOutput()
-        org_filename = os.path.splitext(filename)
-        new_filename = str(org_filename[0])+'_15x15x5.nii'
+        filename_path,filename_name = os.path.split(filename)
+        org_filename = os.path.splitext(filename_name)
+        base_filename = os.path.join(report_out_dirname,org_filename[0])
+        new_filename = str(base_filename)+'_15x15x5.nii'
         itk.imwrite(img,new_filename,compression=True)
         new_ctp_filenames.append(new_filename)
     
-    org_filename = os.path.splitext(ctp_4d_filename)
-    new_ctp_4d_filename = str(org_filename[0])+'_15x15x5.nii'
+    filename_path,filename_name = os.path.split(ctp_4d_filename)
+    org_filename = os.path.splitext(filename_name)
+    base_filename = os.path.join(report_out_dirname,org_filename[0])
+    new_ctp_4d_filename = str(base_filename)+'_15x15x5.nii'
     scv_convert_3d_files_to_4d_file(new_ctp_filenames,
         new_ctp_4d_filename)
 
@@ -773,8 +777,10 @@ def scv_generate_vessel_report(ctp_3d_filenames,
     ResampleMask.SetInterpolator("NearestNeighbor")
     ResampleMask.Update()
     new_mask = ResampleMask.GetOutput()
-    org_filename = os.path.splitext(mask_brain_filename)
-    new_mask_filename = str(org_filename[0])+'_15x15x5.nii'
+    filename_path,filename_name = os.path.split(mask_brain_filename)
+    org_filename = os.path.splitext(filename_name)
+    base_filename = os.path.join(report_out_dirname,org_filename[0])
+    new_mask_filename = str(base_filename)+'_15x15x5.nii'
     itk.imwrite(new_mask,new_mask_filename,compression=True)
 
     # Call matlab and pass it the 4D ctp filename and the output directory
@@ -880,7 +886,7 @@ def scv_generate_vessel_report(ctp_3d_filenames,
             1.5,
             4)
         TubeMath.SmoothTubeProperty("TTP",4)
-        TubeMath.SmoothTubeProperty("TTP_Tissue",12)
+        TubeMath.SmoothTubeProperty("TTP_Tissue",16)
         time_bin,ttp_bin,ttp_count = scv_compute_atlas_region_stats(
             vess_atlas_mask_im,
             fit_ttp_im,
@@ -910,7 +916,7 @@ def scv_generate_vessel_report(ctp_3d_filenames,
             1.5,
             4)
         TubeMath.SmoothTubeProperty("CBF",4)
-        TubeMath.SmoothTubeProperty("CBF_Tissue",12)
+        TubeMath.SmoothTubeProperty("CBF_Tissue",16)
         if ttp_im!=None:
             time_bin,cbf_bin,cbf_count = scv_compute_atlas_region_stats(
                 vess_atlas_mask_im,
@@ -937,7 +943,7 @@ def scv_generate_vessel_report(ctp_3d_filenames,
             1.5,
             4)
         TubeMath.SmoothTubeProperty("CBV",4)
-        TubeMath.SmoothTubeProperty("CBV_Tissue",12)
+        TubeMath.SmoothTubeProperty("CBV_Tissue",16)
         if ttp_im!=None:
             time_bin,cbv_bin,cbv_count = scv_compute_atlas_region_stats(
                 vess_atlas_mask_im,
@@ -963,7 +969,7 @@ def scv_generate_vessel_report(ctp_3d_filenames,
             1.5,
             4)
         TubeMath.SmoothTubeProperty("TMax",4)
-        TubeMath.SmoothTubeProperty("TMax_Tissue",12)
+        TubeMath.SmoothTubeProperty("TMax_Tissue",16)
         if ttp_im!=None:
             time_bin,tmax_bin,tmax_count = scv_compute_atlas_region_stats(
                 vess_atlas_mask_im,
@@ -1040,10 +1046,10 @@ def scv_generate_3d_ctp_vessel_report(ctp_3d_filenames,
                                       report_progress=print,
                                       report_subprogress=print,
                                       debug=False):
-    ctp_3d_filenames,ctp_4d_filename,ct_filename, \
+    ctp_4d_filename,ct_filename, \
         cta_filename,dsa_filename,mask_brain_filename \
             = scv_prepare_3d_for_perfusion_toolbox( \
-                ctp_3d_filename, report_out_dirname, \
+                ctp_3d_filenames, report_out_dirname, \
                 report_progress, report_subprogress, debug)
 
     scv_generate_vessel_report(ctp_3d_filenames, \
