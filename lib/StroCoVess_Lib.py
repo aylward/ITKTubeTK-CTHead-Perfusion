@@ -184,7 +184,8 @@ def scv_segment_brain_from_ct(ct_image,
 def scv_enhance_vessels_in_cta(cta_image,
                                cta_roi_image,
                                report_progress=print,
-                               debug=False ):
+                               debug=False,
+                               output_dirname="."):
 
     ImageType = itk.Image[itk.F,3]
     LabelMapType = itk.Image[itk.UC,3]
@@ -204,26 +205,34 @@ def scv_enhance_vessels_in_cta(cta_image,
     report_progress("Blurring",10)
     imMath = tube.ImageMath[ImageType].New()
     imMath.SetInput(imBrainErode)
-    imMath.Blur(1.5*spacing)
-    imBlur = imMath.GetOutput()
-    imBlurArray = itk.GetArrayViewFromImage(imBlur)
+    imMath.Blur(4*spacing)
+    imBlurBig = imMath.GetOutput()
+    imMath.SetInput(imBrainErode)
+    imMath.Blur(1*spacing)
+    imMath.AddImages(imBlurBig, 1, -1)
+    imDoG = imMath.GetOutput()
+    imDoGArray = itk.GetArrayViewFromImage(imDoG)
+    if debug and output_dirname!=None:
+        itk.imwrite(imDoG, 
+            output_dirname+"/extract_diff_of_gauss.mha",
+            compression=True)
 
     report_progress("Generating Seeds",20)
     numSeeds = 15
     seedCoverage = 20
     seedCoord = np.zeros([numSeeds,3])
     for i in range(numSeeds):
-        seedCoord[i] = np.unravel_index(np.argmax(imBlurArray,
-                           axis=None),imBlurArray.shape)
+        seedCoord[i] = np.unravel_index(np.argmax(imDoGArray,
+                           axis=None),imDoGArray.shape)
         indx = [int(seedCoord[i][0]),int(seedCoord[i][1]),
                 int(seedCoord[i][2])]
         minX = max(indx[0]-seedCoverage,0)
-        maxX = max(indx[0]+seedCoverage,imBlurArray.shape[0])
+        maxX = max(indx[0]+seedCoverage,imDoGArray.shape[0])
         minY = max(indx[1]-seedCoverage,0)
-        maxY = max(indx[1]+seedCoverage,imBlurArray.shape[1])
+        maxY = max(indx[1]+seedCoverage,imDoGArray.shape[1])
         minZ = max(indx[2]-seedCoverage,0)
-        maxZ = max(indx[2]+seedCoverage,imBlurArray.shape[2])
-        imBlurArray[minX:maxX,minY:maxY,minZ:maxZ]=0
+        maxZ = max(indx[2]+seedCoverage,imDoGArray.shape[2])
+        imDoGArray[minX:maxX,minY:maxY,minZ:maxZ]=0
         indx.reverse()
         seedCoord[:][i] = cta_roi_image.TransformIndexToPhysicalPoint(indx)
 
@@ -263,7 +272,8 @@ def scv_enhance_vessels_in_cta(cta_image,
     enhancer.SetUnknownId( 0 )
     enhancer.SetTrainClassifier(True)
     enhancer.SetUseIntensityOnly(True)
-    enhancer.SetScales([0.75*spacing,2*spacing,6*spacing])
+    enhancer.SetUseFeatureMath(True)
+    enhancer.SetScales([1*spacing,2*spacing,6*spacing])
     enhancer.Update()
     enhancer.ClassifyImages()
 
@@ -807,7 +817,8 @@ def scv_generate_vessel_report(ctp_3d_filenames,
         in_im,
         in_brain_im,
         report_progress=report_subprogress,
-        debug=debug)
+        debug=debug,
+        output_dirname=report_out_dirname)
     itk.imwrite(in_vess_im,
         os.path.join(report_out_dirname,
             in_filename_base+"_vessels_enhanced.mha"),
