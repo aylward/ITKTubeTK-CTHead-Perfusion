@@ -227,11 +227,11 @@ def scv_enhance_vessels_in_cta(cta_image,
         indx = [int(seedCoord[i][0]),int(seedCoord[i][1]),
                 int(seedCoord[i][2])]
         minX = max(indx[0]-seedCoverage,0)
-        maxX = max(indx[0]+seedCoverage,imDoGArray.shape[0])
+        maxX = min(indx[0]+seedCoverage,imDoGArray.shape[0])
         minY = max(indx[1]-seedCoverage,0)
-        maxY = max(indx[1]+seedCoverage,imDoGArray.shape[1])
+        maxY = min(indx[1]+seedCoverage,imDoGArray.shape[1])
         minZ = max(indx[2]-seedCoverage,0)
-        maxZ = max(indx[2]+seedCoverage,imDoGArray.shape[2])
+        maxZ = min(indx[2]+seedCoverage,imDoGArray.shape[2])
         imDoGArray[minX:maxX,minY:maxY,minZ:maxZ]=0
         indx.reverse()
         seedCoord[:][i] = cta_roi_image.TransformIndexToPhysicalPoint(indx)
