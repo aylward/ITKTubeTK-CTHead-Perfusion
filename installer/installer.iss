@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 [Setup]
-AppVersion=0.1
+AppVersion=2.1
 AppName=StrokeCollateralVessels
 AppContact=Kitware, Inc.
 AppPublisher=Kitware, Inc.
