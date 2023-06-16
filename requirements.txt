@@ -1,0 +1,5 @@
+numpy
+itk-tubetk>=1.3.5
+itkwidgets[all]>=1.0a20
+matplotlib
+jupyterlab
